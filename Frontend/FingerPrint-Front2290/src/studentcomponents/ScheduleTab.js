@@ -15,28 +15,34 @@ function ScheduleTab() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const userString = localStorage.getItem("email")
-        if (!userString) return
+        const userString = localStorage.getItem("email");
+        if (!userString) return;
 
-        let email = null
+        let email = null;
         try {
-          const parsed = JSON.parse(userString)
-          email = typeof parsed === "object" && parsed.email ? parsed.email : parsed
+          const parsed = JSON.parse(userString);
+          email = typeof parsed === "object" && parsed.email ? parsed.email : parsed;
         } catch {
-          email = userString
+          email = userString;
         }
 
-        if (!email || email.trim() === "") return
+        if (!email || email.trim() === "") return;
 
-        const table = await fetchTimeTable(email)
-        setTimeTable(table)
+        const table = await fetchTimeTable(email);
+        setTimeTable(table);
+
+        // ✅ Automatically show first available day
+        if (table.length > 0) {
+          setActiveDay(table[0].day);
+        }
       } catch (error) {
-        console.error("❌ Error loading schedule data:", error)
+        console.error("❌ Error loading schedule data:", error);
       }
-    }
+    };
 
-    loadData()
-  }, [])
+    loadData();
+  }, []);
+
 
   return (
     <div className="section-layout">

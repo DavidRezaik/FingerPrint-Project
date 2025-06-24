@@ -82,63 +82,99 @@ export const fetchAllFaculties = async () => {
 
 
 
-// Fetch timetable for student
+
+// Fetch all lectures and filter by faculty name
 export const fetchTimeTable = async (email) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/Studets/DashBordStudets?Email=${email}`, {
-      headers: { "Content-Type": "application/json" }
-    })
+    if (!email || email.trim() === "") return [];
 
-    if (!response.data || !Array.isArray(response.data)) {
-      throw new Error("Invalid data structure received from API")
-    }
+    const profile = await fetchStudentProfile(email);
+    const student = Array.isArray(profile) ? profile[0] : profile;
+    const facYearSemId = student?.facYearSem_ID;
 
-    if (response.data.length === 0) {
-      return []
-    }
+    // Fetch mapping data to get faculty name
+    const [semesters, facultyYears, faculties] = await Promise.all([
+      fetchAllSemesters(),
+      fetchAllFacultyYears(),
+      fetchAllFaculties()
+    ]);
 
-    return response.data.map(item => ({
-      day: "Sunday",
-      courseCode: item.st_Code,
-      course: item.st_NameEn,
-      instructor: "Dr. Smith",
-      location: "Room 101",
-      time: "08:00 AM - 10:00 AM",
-      studentsCount: 25
-    }))
-  } catch (error) {
-    console.error("Error fetching timetable:", error)
-    return []
+    const semester = semesters.find(s => s.id === facYearSemId);
+    const year = facultyYears.find(y => y.id === semester?.facultyYearId);
+    const faculty = faculties.find(f => f.id === year?.facultyId);
+
+    if (!faculty?.fac_Name) return [];
+
+    const lecturesRes = await axios.get(`${API_BASE_URL}/api/Lecture/GetAllLecture`);
+    const allLectures = lecturesRes.data;
+    console.log("🎓 Faculty name used for filtering:", faculty?.fac_Name);
+    console.log("📚 Total lectures from API:", allLectures.length);
+
+    // ✅ Filter lectures by faculty name (case-insensitive recommended)
+    const filtered = allLectures.filter(l =>
+      l.fac_Name?.toLowerCase().trim() === faculty.fac_Name?.toLowerCase().trim()
+    );
+
+    // ✅ Map filtered lectures
+    const dayMap = {
+      0: "Sunday",
+      1: "Monday",
+      2: "Tuesday",
+      3: "Wednesday",
+      4: "Thursday",
+      5: "Friday",
+      6: "Saturday",
+    };
+
+    const mapped = filtered.map(lec => {
+      const readableDay = dayMap[lec.day] || "Unknown";
+      console.log(`📆 ${lec.lecture_Name} mapped to day: ${readableDay}`);
+
+      return {
+        course: lec.sub_Name,
+        courseCode: lec.lecture_Name,
+        instructor: lec.dr_NameAr,
+        location: "Main Campus",
+        time: `${lec.fromTime.slice(0, 5)} - ${lec.toTime.slice(0, 5)}`,
+        day: readableDay
+      };
+    });
+
+
+    console.log("📅 Filtered timetable data:", mapped);
+    return mapped;
+  } catch (err) {
+    console.error("❌ Failed to fetch or map timetable:", err);
+    return [];
   }
-}
+};
 
-// Fetch attendance details for a specific course
-export const fetchCourseAttendance = async (id) => {
+
+
+// Fetch Courses
+export const fetchCourseAttendance = async (email) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/Subjects/${id}`, {
-      headers: { "Content-Type": "application/json" }
-    })
+    if (!email || email.trim() === "") return []
 
-    if (!response.data || !Array.isArray(response.data)) {
-      throw new Error("Invalid data structure received from API")
-    }
+    const fullUrl = `${API_BASE_URL}/api/Studets/GetStudetByEmail?Email=${encodeURIComponent(email)}`
+    const response = await axios.get(fullUrl)
 
-    if (response.data.length === 0) {
-      return []
-    }
+    const student = response.data
 
-    return response.data.map(item => ({
-      courseCode: item.subCode,
-      name: item.subName,
-      instructor: item.doctor,
-      credit: item.credit,
-      status: item.status
+    if (!student || !student.studentRooms || !Array.isArray(student.studentRooms)) return []
+
+    return student.studentRooms.map((item) => ({
+      courseCode: item.subject?.subCode || "N/A",
+      name: item.subject?.subName || "Unnamed",
+      instructor: item.doctor?.dr_NameEn || "TBD",
+      credit: item.subject?.credit || 3,
     }))
   } catch (error) {
-    console.error("Error fetching course attendance:", error)
+    console.error("❌ Error fetching course attendance from studentRooms:", error)
     return []
   }
 }
+
 
 // Fetch attendance summary (mocked for now)
 export const fetchAttendanceSummary = async () => {
@@ -214,5 +250,4 @@ export const fetchStudentNotifications = async (facYearSem_ID) => {
     return []
   }
 }
-
 

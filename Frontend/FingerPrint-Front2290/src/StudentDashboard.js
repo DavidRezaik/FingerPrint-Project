@@ -245,7 +245,7 @@ setCourses(courseList)
   const tabs = [
     { id: "dashboard", label: t("Dashboard"), icon: <FaHome /> },
     { id: "profile", label: t("Profile"), icon: <FaUser /> },
-    { id: "courseAttendance", label: t("Course Attendance"), icon: <FaBook /> },
+  { id: "courses", label: t("Courses"), icon: <FaBook /> }, 
     { id: "fingerprintLog", label: t("Fingerprint Log"), icon: <FaFingerprint /> },
     { id: "schedule", label: t("Schedule"), icon: <FaCalendarAlt /> },
     {
@@ -476,7 +476,7 @@ setCourses(courseList)
 
                 {activeTab === "dashboard" && <DashboardTab {...commonProps} />}
                 {activeTab === "profile" && <ProfileTab {...commonProps} />}
-                {activeTab === "courseAttendance" && <CourseAttendanceTab {...commonProps} />}
+                {activeTab === "courses" && <CourseAttendanceTab {...commonProps} />}
                 {activeTab === "fingerprintLog" && <FingerprintLogTab {...commonProps} />}
                 {activeTab === "schedule" && <ScheduleTab {...commonProps} />}
                 {activeTab === "notifications" && <NotificationsTab {...commonProps} />}

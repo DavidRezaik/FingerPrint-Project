@@ -15,7 +15,13 @@ function CourseAttendanceTab({ searchQuery }) {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [courseList, logs] = await Promise.all([fetchCourseAttendance(), fetchFingerprintLogs()])
+        const emailObj = JSON.parse(localStorage.getItem("email"))
+        const email = typeof emailObj === "object" ? emailObj.email : emailObj
+
+        const [courseList, logs] = await Promise.all([
+          fetchCourseAttendance(email),
+          fetchFingerprintLogs()
+        ])
 
         setCourses(courseList)
         setFingerprintLogs(logs)
@@ -44,18 +50,12 @@ function CourseAttendanceTab({ searchQuery }) {
       course.instructor?.toLowerCase().includes(searchQuery.toLowerCase())
 
     let matchesFilter = true
-    if (courseFilter === "low") {
+    if (courseFilter === "low" || courseFilter === "good") {
       const logsForCourse = fingerprintLogs.filter((log) => log.courseCode === course.courseCode)
       const successLogs = logsForCourse.filter((log) => log.result === "Success").length
       const totalSessions = logsForCourse.length || 1
       const attendancePercent = Math.round((successLogs / totalSessions) * 100)
-      matchesFilter = attendancePercent < 75
-    } else if (courseFilter === "good") {
-      const logsForCourse = fingerprintLogs.filter((log) => log.courseCode === course.courseCode)
-      const successLogs = logsForCourse.filter((log) => log.result === "Success").length
-      const totalSessions = logsForCourse.length || 1
-      const attendancePercent = Math.round((successLogs / totalSessions) * 100)
-      matchesFilter = attendancePercent >= 75
+      matchesFilter = courseFilter === "low" ? attendancePercent < 75 : attendancePercent >= 75
     }
 
     return matchesSearch && matchesFilter
