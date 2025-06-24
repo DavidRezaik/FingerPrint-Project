@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { FaFingerprint } from "react-icons/fa"
-import { fetchStudentProfile, matchFingerprint } from "../services/studentService"
+import {
+  fetchStudentProfile,
+  fetchAllSemesters,
+  fetchAllFacultyYears,
+  fetchAllFaculties,
+  matchFingerprint
+} from "../services/studentService"
 import { useLanguage } from "../contexts/LanguageContext"
 
 function ProfileTab() {
@@ -32,6 +38,17 @@ function ProfileTab() {
 
         const apiData = Array.isArray(profileData) ? profileData[0] : profileData
 
+        // 🔁 Fetch the mapping data
+        const [semesters, facultyYears, faculties] = await Promise.all([
+          fetchAllSemesters(),
+          fetchAllFacultyYears(),
+          fetchAllFaculties()
+        ])
+
+        const currentSemester = semesters.find(s => s.id === apiData.facYearSem_ID)
+        const facultyYear = facultyYears.find(fy => fy.id === currentSemester?.facultyYearId)
+        const faculty = faculties.find(f => f.id === facultyYear?.facultyId)
+
         const mappedStudent = {
           id: apiData.id,
           displayName: apiData.st_NameEn || apiData.st_NameAr || "Unknown",
@@ -40,9 +57,9 @@ function ProfileTab() {
           email: apiData.st_Email,
           studentCode: apiData.st_Code,
           phone: apiData.phone,
-          year: apiData.facultyYearSemister,
-          department: "Computer Science",
-          gpa: "3.5",
+          year: facultyYear?.year || "Unknown",
+          department: faculty?.fac_Name || "Unknown",
+          gpa: currentSemester?.sem_Name || "Unknown",
           fingerprintRegistered: apiData.fingerID > 0,
           fingerID: apiData.fingerID,
           st_Image: apiData.st_Image,
@@ -74,11 +91,13 @@ function ProfileTab() {
   return (
     <div className="profile-layout">
       <div className="profile-header">
-        <div className="profile-avatar-large">{student.displayName?.charAt(0) || "S"}</div>
+        <div className="profile-avatar-large">
+          {student.displayName?.charAt(0) || "S"}
+        </div>
         <div className="profile-header-info">
           <h1>{student.displayName}</h1>
           <p>
-            {student.department} • {student.year} {t("Year")}
+            {student.department} • {student.year}
           </p>
         </div>
       </div>
@@ -118,7 +137,7 @@ function ProfileTab() {
               <p>{student.year}</p>
             </div>
             <div className="profile-info-item">
-              <label>{t("GPA")}</label>
+              <label>{t("Semester")}</label>
               <p>{student.gpa}</p>
             </div>
           </div>
@@ -141,7 +160,11 @@ function ProfileTab() {
                 <div>
                   <h4>{t("Fingerprint Not Registered")}</h4>
                   <p>{t("Please register your fingerprint for attendance tracking.")}</p>
-                  <button onClick={handleFingerprintScan} className="register-btn" disabled={isFingerprintScanning}>
+                  <button
+                    onClick={handleFingerprintScan}
+                    className="register-btn"
+                    disabled={isFingerprintScanning}
+                  >
                     {isFingerprintScanning ? t("Scanning...") : t("Register Now")}
                   </button>
                 </div>

@@ -1,10 +1,10 @@
-import axios from 'axios';
+import axios from 'axios'
 import config from "../config"
 
-// At the top of your studentService.js file
-const API_BASE_URL = config.BASE_URL;// Make sure this is correct
-console.log("🔧 API_BASE_URL is set to:", API_BASE_URL);
+const API_BASE_URL = config.BASE_URL
+console.log("🔧 API_BASE_URL is set to:", API_BASE_URL)
 
+//Get Student Data 
 export const fetchStudentProfile = async (email) => {
   // Validate email before making the request
   if (!email || email === 'undefined' || email.trim() === '') {
@@ -44,144 +44,175 @@ export const fetchStudentProfile = async (email) => {
     throw error;
   }
 };
-//---------------------------------------------------------------------------------------
 
 
-export const fetchTimeTable = async (email) => {
+
+// Get  Semesters
+export const fetchAllSemesters = async () => {
   try {
-    const response = await axios.get(
-      `${API_BASE_URL}/api/Studets/DashBordStudets?Email=${email}`,
-      {
-        headers: {
-          "Content-Type": "application/json"
-        }
-      }
-    );
-
-    if (!response.data || !Array.isArray(response.data)) {
-      throw new Error("Invalid data structure received from API");
-    }
-
-    if (response.data.length === 0) {
-      return []; // No timetable
-    }
-
-    // You may adjust mapping here if needed based on actual timetable schema
-    const schedule = response.data.map(item => ({
-      day: "Sunday", // 🔧 TEMP — replace this with correct `item.day` when available
-      courseCode: item.st_Code,
-      course: item.st_NameEn,
-      instructor: "Dr. Smith", // 🔧 TEMP
-      location: "Room 101",    // 🔧 TEMP
-      time: "08:00 AM - 10:00 AM", // 🔧 TEMP
-      studentsCount: 25        // 🔧 TEMP
-    }));
-
-    return schedule;
-
+    const response = await axios.get(`${API_BASE_URL}/api/FacultyYearSemister/GetAllSemisters`);
+    return response.data;
   } catch (error) {
-    console.error("Error fetching timetable:", error);
+    console.error("❌ Failed to fetch semesters:", error);
+    return [];
+  }
+};
+
+//  Get  Faculty Years
+export const fetchAllFacultyYears = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/FacultyYear/GetAllFacultyYear`);
+    return response.data;
+  } catch (error) {
+    console.error("❌ Failed to fetch faculty years:", error);
+    return [];
+  }
+};
+
+// Get Faculties
+export const fetchAllFaculties = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/Faculty/GetAllFaculty`);
+    return response.data;
+  } catch (error) {
+    console.error("❌ Failed to fetch faculties:", error);
     return [];
   }
 };
 
 
-//---------------------------------------------------------------------------------------
 
-
-
-export const fetchCourseAttendance = async (id) => {
+// Fetch timetable for student
+export const fetchTimeTable = async (email) => {
   try {
-    const response = await axios.get(
-      `${API_BASE_URL}/api/Subjects/${id}`,
-      {
-        headers: {
-          "Content-Type": "application/json"
-        }
-      }
-    );
+    const response = await axios.get(`${API_BASE_URL}/api/Studets/DashBordStudets?Email=${email}`, {
+      headers: { "Content-Type": "application/json" }
+    })
 
     if (!response.data || !Array.isArray(response.data)) {
-      throw new Error("Invalid data structure received from API");
+      throw new Error("Invalid data structure received from API")
     }
 
     if (response.data.length === 0) {
-      return []; // لا توجد بيانات، نرجع مصفوفة فارغة
+      return []
     }
 
-    // تحويل كل عنصر في المصفوفة إلى كائن حضور المادة المطلوب
-    const courseAttendance = response.data.map(item => ({
+    return response.data.map(item => ({
+      day: "Sunday",
+      courseCode: item.st_Code,
+      course: item.st_NameEn,
+      instructor: "Dr. Smith",
+      location: "Room 101",
+      time: "08:00 AM - 10:00 AM",
+      studentsCount: 25
+    }))
+  } catch (error) {
+    console.error("Error fetching timetable:", error)
+    return []
+  }
+}
+
+// Fetch attendance details for a specific course
+export const fetchCourseAttendance = async (id) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/Subjects/${id}`, {
+      headers: { "Content-Type": "application/json" }
+    })
+
+    if (!response.data || !Array.isArray(response.data)) {
+      throw new Error("Invalid data structure received from API")
+    }
+
+    if (response.data.length === 0) {
+      return []
+    }
+
+    return response.data.map(item => ({
       courseCode: item.subCode,
       name: item.subName,
       instructor: item.doctor,
       credit: item.credit,
       status: item.status
-    }));
-
-    return courseAttendance;
-
+    }))
   } catch (error) {
-    console.error("Error fetching course attendance:", error);
-    return [];
+    console.error("Error fetching course attendance:", error)
+    return []
   }
-};
+}
 
-//---------------------------------------------------------------------------------------
-
-
-
+// Fetch attendance summary (mocked for now)
 export const fetchAttendanceSummary = async () => {
   return {
     total: 30,
     attended: 26,
     missed: 4,
     percentage: 86.6
-  };
-};
+  }
+}
 
+// Fetch fingerprint logs and merge with course data
 export const fetchFingerprintLogs = async () => {
   try {
-    // جلب سجلات البصمة
     const logsResponse = await axios.get(`${API_BASE_URL}/api/FingerprintLogs/GetAllFingerprintLogs`, {
-      headers: {
-        "Content-Type": "application/json"
-      }
-    });
+      headers: { "Content-Type": "application/json" }
+    })
 
-    if (!logsResponse.data) throw new Error("Failed to fetch fingerprint logs");
+    if (!logsResponse.data) throw new Error("Failed to fetch fingerprint logs")
 
-    const logsData = logsResponse.data;
-
-    // جلب تفاصيل الكورسات
     const courseResponse = await axios.get(`${API_BASE_URL}/api/Attendance/GetAllSubjects`, {
-      headers: {
-        "Content-Type": "application/json"
-      }
-    });
+      headers: { "Content-Type": "application/json" }
+    })
 
-    if (!courseResponse.data) throw new Error("Failed to fetch course details");
+    if (!courseResponse.data) throw new Error("Failed to fetch course details")
 
-    const courseData = courseResponse.data;
+    const logsData = logsResponse.data
+    const courseData = courseResponse.data
 
-    // دمج البيانات وتنسيقها
     return logsData.map((log, index) => ({
       date: log.date || "2025-05-05",
       time: log.time || "09:00 AM",
       location: log.location || "Main Gate",
       result: log.result || "Success",
       courseCode: courseData[index]?.subCode || "CS201"
-    }));
+    }))
   } catch (error) {
-    console.error("Error fetching fingerprint logs:", error);
-    return [];
+    console.error("Error fetching fingerprint logs:", error)
+    return []
   }
-};
+}
 
+// Simulate fingerprint match (mock)
 export const matchFingerprint = async () => {
-  const success = Math.random() > 0.2;
+  const success = Math.random() > 0.2
   return {
     success,
     message: success ? "Fingerprint matched ✅" : "Fingerprint not matched ❌"
-  };
-};
+  }
+}
+
+// ✅ NEW: Fetch notifications for the student's academic semester
+export const fetchStudentNotifications = async (facYearSem_ID) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/Notification/GetAllNotifications`, {
+      headers: { "Content-Type": "application/json" }
+    })
+
+    if (!Array.isArray(response.data)) return []
+
+    const filtered = response.data.filter((n) => n.facYearSem_ID === facYearSem_ID)
+
+    const readIds = JSON.parse(localStorage.getItem("readNotifications") || "[]")
+
+    const withReadStatus = filtered.map((n) => ({
+      ...n,
+      isRead: readIds.includes(n.id),
+    }))
+
+    return withReadStatus
+  } catch (error) {
+    console.error("❌ Failed to fetch student notifications:", error)
+    return []
+  }
+}
+
 

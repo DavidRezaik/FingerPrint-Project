@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   FaUser,
@@ -21,6 +21,16 @@ import {
   FaHome,
 } from "react-icons/fa"
 import { motion, AnimatePresence } from "framer-motion"
+import {
+  fetchStudentProfile,
+  fetchTimeTable,
+  fetchAttendanceSummary,
+  fetchFingerprintLogs,
+  matchFingerprint,
+  fetchCourseAttendance,
+  fetchStudentNotifications 
+} from "./services/studentService"
+
 import "./dashboard.css"
 import { useLanguage } from "./contexts/LanguageContext"
 import EditProfileModal from "./components/EditProfileModal"
@@ -32,6 +42,8 @@ import FingerprintLogTab from "./studentcomponents/FingerprintLogTab"
 import ScheduleTab from "./studentcomponents/ScheduleTab"
 import NotificationsTab from "./studentcomponents/NotificationsTab"
 import SettingsTab from "./studentcomponents/SettingsTab"
+
+const profile = await fetchStudentProfile()
 
 function StudentDashboard() {
   const navigate = useNavigate()
@@ -46,20 +58,100 @@ function StudentDashboard() {
   const profileDropdownRef = useRef(null)
   const { t, isRTL, toggleLanguage } = useLanguage()
 
-  // Basic student info for header display
-  const [student, setStudent] = useState({
-    displayName: "Student Name",
-    email: "student@example.com",
+  // Student data states
+  const [student, setStudent] = useState({})
+  const [TimeTable, setTimeTable] = useState([])
+  const [attendanceSummary, setAttendanceSummary] = useState({})
+  const [fingerprintLogs, setFingerprintLogs] = useState([])
+  const [fingerprintTodayScanned, setFingerprintTodayScanned] = useState(false)
+  const [courses, setCourses] = useState([])
+  const [activeDay, setActiveDay] = useState(() => {
+    return new Date().toLocaleDateString("en-US", { weekday: "long" })
   })
+const [notifications, setNotifications] = useState([])
 
-  const [showEditProfile, setShowEditProfile] = useState(false)
-  const [showChangePassword, setShowChangePassword] = useState(false)
-  const [userProfile, setUserProfile] = useState({})
-  const [passwordInputs, setPasswordInputs] = useState({
-    oldPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  })
+  const [isFingerprintScanning, setIsFingerprintScanning] = useState(false)
+
+  const [logResultFilter, setLogResultFilter] = useState("all")
+  const [logLocationFilter, setLogLocationFilter] = useState("all")
+  const [courseFilter, setCourseFilter] = useState("all")
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const userString = localStorage.getItem("email")
+        if (!userString) {
+          console.log("ℹ️ No user data found - user needs to login first")
+          return
+        }
+
+        let email = null
+
+        try {
+          const parsed = JSON.parse(userString)
+          email = typeof parsed === "object" && parsed.email ? parsed.email : parsed
+        } catch {
+          email = userString
+        }
+
+        if (!email || email.trim() === "") {
+          console.log("ℹ️ No valid email found")
+          return
+        }
+
+        const profileData = await fetchStudentProfile(email)
+        if (!profileData) {
+          console.log("ℹ️ No profile data returned")
+          return
+        }
+
+        const apiData = Array.isArray(profileData) ? profileData[0] : profileData
+
+        const mappedStudent = {
+          id: apiData.id,
+          displayName: apiData.st_NameEn || apiData.st_NameAr || "Unknown",
+          st_NameAr: apiData.st_NameAr,
+          st_NameEn: apiData.st_NameEn,
+          email: apiData.st_Email,
+          studentCode: apiData.st_Code,
+          phone: apiData.phone,
+          year: apiData.facultyYearSemister,
+          department: "Computer Science",
+          gpa: "3.5",
+          fingerprintRegistered: apiData.fingerID > 0,
+          fingerID: apiData.fingerID,
+          st_Image: apiData.st_Image,
+          facYearSem_ID: apiData.facYearSem_ID,
+        }
+
+      setStudent(mappedStudent)
+
+const notificationsList = await fetchStudentNotifications(mappedStudent.facYearSem_ID)
+setNotifications(notificationsList)
+
+const [table, summary, logs, courseList] = await Promise.all([
+  fetchTimeTable(email),
+  fetchAttendanceSummary(),
+  fetchFingerprintLogs(),
+  fetchCourseAttendance()
+])
+
+setTimeTable(table)
+setAttendanceSummary(summary)
+setFingerprintLogs(logs)
+setCourses(courseList)
+
+
+        const today = new Date().toISOString().slice(0, 10)
+        const scannedToday = logs.some((log) => log.date === today && log.result === "Success")
+        setFingerprintTodayScanned(scannedToday)
+      } catch (error) {
+        console.error("❌ Error loading student data:", error)
+      }
+    }
+
+    loadData()
+  }, [])
 
   const handleEditProfile = () => {
     setUserProfile({
@@ -73,6 +165,52 @@ function StudentDashboard() {
   const handleChangePassword = () => {
     setShowChangePassword(true)
     setProfileDropdownOpen(false)
+  }
+
+  const [showEditProfile, setShowEditProfile] = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [userProfile, setUserProfile] = useState({})
+  const [passwordInputs, setPasswordInputs] = useState({
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  })
+
+  const handleGenerateReport = () => {
+    const reportData = {
+      student: student.displayName,
+      totalCourses: courses.length,
+      attendanceRate: attendanceSummary.percentage,
+      date: new Date().toLocaleDateString(),
+    }
+
+    alert(
+      `Attendance Report Generated:\n\nStudent: ${reportData.student}\nAttendance Rate: ${reportData.attendanceRate}%\nTotal Courses: ${reportData.totalCourses}`,
+    )
+  }
+
+  const handleMarkNotificationRead = (index) => {
+  const updated = [...notifications]
+  const note = updated[index]
+
+  updated[index].isRead = !note.isRead
+  setNotifications(updated)
+
+  const key = "readNotifications"
+  let stored = JSON.parse(localStorage.getItem(key) || "[]")
+
+  if (updated[index].isRead) {
+    stored = [...new Set([...stored, note.id])]
+  } else {
+    stored = stored.filter((id) => id !== note.id)
+  }
+
+  localStorage.setItem(key, JSON.stringify(stored))
+}
+
+
+  const handleMarkAllNotificationsRead = () => {
+    setNotifications((prev) => prev.map((notification) => ({ ...notification, isRead: true })))
   }
 
   const handleLogout = () => {
@@ -90,13 +228,32 @@ function StudentDashboard() {
     toggleLanguage()
   }
 
+  const handleFingerprintScan = async () => {
+    setIsFingerprintScanning(true)
+    try {
+      const result = await matchFingerprint()
+      alert(result.message)
+      if (result.success) setFingerprintTodayScanned(true)
+    } catch (error) {
+      alert(t("Failed to scan fingerprint."))
+      console.error(error)
+    } finally {
+      setIsFingerprintScanning(false)
+    }
+  }
+
   const tabs = [
     { id: "dashboard", label: t("Dashboard"), icon: <FaHome /> },
     { id: "profile", label: t("Profile"), icon: <FaUser /> },
     { id: "courseAttendance", label: t("Course Attendance"), icon: <FaBook /> },
     { id: "fingerprintLog", label: t("Fingerprint Log"), icon: <FaFingerprint /> },
     { id: "schedule", label: t("Schedule"), icon: <FaCalendarAlt /> },
-    { id: "notifications", label: t("Notifications"), icon: <FaBell /> },
+    {
+      id: "notifications",
+      label: t("Notifications"),
+      icon: <FaBell />,
+      badge: notifications.filter((n) => !n.isRead).length,
+    },
     { id: "settings", label: t("Settings"), icon: <FaCog /> },
   ]
 
@@ -105,34 +262,81 @@ function StudentDashboard() {
     return tab ? tab.label : ""
   }
 
-  const renderActiveTab = () => {
-    switch (activeTab) {
-      case "dashboard":
-        return <DashboardTab setActiveTab={setActiveTab} />
-      case "profile":
-        return <ProfileTab />
-      case "courseAttendance":
-        return <CourseAttendanceTab searchQuery={searchQuery} />
-      case "fingerprintLog":
-        return <FingerprintLogTab searchQuery={searchQuery} />
-      case "schedule":
-        return <ScheduleTab />
-      case "notifications":
-        return <NotificationsTab />
-      case "settings":
-        return (
-          <SettingsTab
-            darkMode={darkMode}
-            toggleDarkMode={toggleDarkMode}
-            language={language}
-            handleLanguageToggle={handleLanguageToggle}
-            setShowEditProfile={setShowEditProfile}
-            setShowChangePassword={setShowChangePassword}
-          />
-        )
-      default:
-        return <DashboardTab setActiveTab={setActiveTab} />
+  const filteredLogs = fingerprintLogs.filter((log) => {
+    const matchesSearch =
+      searchQuery === "" ||
+      log.date.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.courseCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.result.toLowerCase().includes(searchQuery.toLowerCase())
+
+    const matchesResult = logResultFilter === "all" || log.result.toLowerCase() === logResultFilter.toLowerCase()
+
+    const matchesLocation =
+      logLocationFilter === "all" || log.location.toLowerCase().includes(logLocationFilter.toLowerCase())
+
+    return matchesSearch && matchesResult && matchesLocation
+  })
+
+  const filteredCourses = courses.filter((course) => {
+    const matchesSearch =
+      searchQuery === "" ||
+      course.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.courseCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.instructor?.toLowerCase().includes(searchQuery.toLowerCase())
+
+    let matchesFilter = true
+    if (courseFilter === "low") {
+      const logsForCourse = fingerprintLogs.filter((log) => log.courseCode === course.courseCode)
+      const successLogs = logsForCourse.filter((log) => log.result === "Success").length
+      const totalSessions = logsForCourse.length || 1
+      const attendancePercent = Math.round((successLogs / totalSessions) * 100)
+      matchesFilter = attendancePercent < 75
+    } else if (courseFilter === "good") {
+      const logsForCourse = fingerprintLogs.filter((log) => log.courseCode === course.courseCode)
+      const successLogs = logsForCourse.filter((log) => log.result === "Success").length
+      const totalSessions = logsForCourse.length || 1
+      const attendancePercent = Math.round((successLogs / totalSessions) * 100)
+      matchesFilter = attendancePercent >= 75
     }
+
+    return matchesSearch && matchesFilter
+  })
+
+  const commonProps = {
+    t,
+    isRTL,
+    student,
+    TimeTable,
+    attendanceSummary,
+    fingerprintLogs,
+    fingerprintTodayScanned,
+    courses,
+    activeDay,
+    setActiveDay,
+    notifications,
+    setNotifications,
+    isFingerprintScanning,
+    logResultFilter,
+    setLogResultFilter,
+    logLocationFilter,
+    setLogLocationFilter,
+    courseFilter,
+    setCourseFilter,
+    searchQuery,
+    filteredLogs,
+    filteredCourses,
+    handleFingerprintScan,
+    handleGenerateReport,
+    handleMarkNotificationRead,
+    handleMarkAllNotificationsRead,
+    setActiveTab,
+    darkMode,
+    toggleDarkMode,
+    language,
+    handleLanguageToggle,
+    setShowEditProfile,
+    setShowChangePassword,
   }
 
   return (
@@ -250,32 +454,38 @@ function StudentDashboard() {
                 transition={{ duration: 0.4 }}
                 className="tab-content"
               >
-                {renderActiveTab()}
+                {showEditProfile && (
+                  <EditProfileModal
+                    userProfile={userProfile}
+                    setUserProfile={setUserProfile}
+                    onClose={() => setShowEditProfile(false)}
+                  />
+                )}
+
+                {showChangePassword && (
+                  <ChangePasswordModal
+                    inputs={passwordInputs}
+                    setInputs={setPasswordInputs}
+                    onClose={() => setShowChangePassword(false)}
+                    onSuccess={() => {
+                      alert("Password updated successfully.")
+                      setShowChangePassword(false)
+                    }}
+                  />
+                )}
+
+                {activeTab === "dashboard" && <DashboardTab {...commonProps} />}
+                {activeTab === "profile" && <ProfileTab {...commonProps} />}
+                {activeTab === "courseAttendance" && <CourseAttendanceTab {...commonProps} />}
+                {activeTab === "fingerprintLog" && <FingerprintLogTab {...commonProps} />}
+                {activeTab === "schedule" && <ScheduleTab {...commonProps} />}
+                {activeTab === "notifications" && <NotificationsTab {...commonProps} />}
+                {activeTab === "settings" && <SettingsTab {...commonProps} />}
               </motion.div>
             </AnimatePresence>
           </div>
         </div>
       </div>
-
-      {showEditProfile && (
-        <EditProfileModal
-          userProfile={userProfile}
-          setUserProfile={setUserProfile}
-          onClose={() => setShowEditProfile(false)}
-        />
-      )}
-
-      {showChangePassword && (
-        <ChangePasswordModal
-          inputs={passwordInputs}
-          setInputs={setPasswordInputs}
-          onClose={() => setShowChangePassword(false)}
-          onSuccess={() => {
-            alert("Password updated successfully.")
-            setShowChangePassword(false)
-          }}
-        />
-      )}
     </div>
   )
 }
