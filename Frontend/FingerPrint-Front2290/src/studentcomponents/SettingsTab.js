@@ -1,8 +1,8 @@
 "use client"
 
+import { useLanguage } from "../contexts/LanguageContext"
+
 function SettingsTab({
-  t,
-  isRTL,
   darkMode,
   toggleDarkMode,
   language,
@@ -10,6 +10,8 @@ function SettingsTab({
   setShowEditProfile,
   setShowChangePassword,
 }) {
+  const { t, isRTL } = useLanguage()
+
   return (
     <div className="section-layout">
       <div className="section-header">

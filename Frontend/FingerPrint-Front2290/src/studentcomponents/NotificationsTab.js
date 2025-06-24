@@ -1,6 +1,28 @@
 "use client"
 
-function NotificationsTab({ t, notifications, handleMarkNotificationRead, handleMarkAllNotificationsRead }) {
+import { useState } from "react"
+import { useLanguage } from "../contexts/LanguageContext"
+
+function NotificationsTab() {
+  const { t } = useLanguage()
+
+  const [notifications, setNotifications] = useState([
+    { message: "Midterm exams start next week.", date: "2025-04-05", isRead: false },
+    { message: "Project deadline extended.", date: "2025-04-03", isRead: true },
+    { message: "New course materials available.", date: "2025-04-01", isRead: false },
+    { message: "Campus closed for holiday.", date: "2025-03-28", isRead: true },
+  ])
+
+  const handleMarkNotificationRead = (index) => {
+    setNotifications((prev) =>
+      prev.map((notification, i) => (i === index ? { ...notification, isRead: !notification.isRead } : notification)),
+    )
+  }
+
+  const handleMarkAllNotificationsRead = () => {
+    setNotifications((prev) => prev.map((notification) => ({ ...notification, isRead: true })))
+  }
+
   return (
     <div className="section-layout">
       <div className="section-header">

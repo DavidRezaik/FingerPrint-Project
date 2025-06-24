@@ -1,8 +1,76 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { FaFingerprint } from "react-icons/fa"
+import { fetchStudentProfile, matchFingerprint } from "../services/studentService"
+import { useLanguage } from "../contexts/LanguageContext"
 
-function ProfileTab({ t, student, handleFingerprintScan, isFingerprintScanning }) {
+function ProfileTab() {
+  const { t } = useLanguage()
+
+  const [student, setStudent] = useState({})
+  const [isFingerprintScanning, setIsFingerprintScanning] = useState(false)
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const userString = localStorage.getItem("email")
+        if (!userString) return
+
+        let email = null
+        try {
+          const parsed = JSON.parse(userString)
+          email = typeof parsed === "object" && parsed.email ? parsed.email : parsed
+        } catch {
+          email = userString
+        }
+
+        if (!email || email.trim() === "") return
+
+        const profileData = await fetchStudentProfile(email)
+        if (!profileData) return
+
+        const apiData = Array.isArray(profileData) ? profileData[0] : profileData
+
+        const mappedStudent = {
+          id: apiData.id,
+          displayName: apiData.st_NameEn || apiData.st_NameAr || "Unknown",
+          st_NameAr: apiData.st_NameAr,
+          st_NameEn: apiData.st_NameEn,
+          email: apiData.st_Email,
+          studentCode: apiData.st_Code,
+          phone: apiData.phone,
+          year: apiData.facultyYearSemister,
+          department: "Computer Science",
+          gpa: "3.5",
+          fingerprintRegistered: apiData.fingerID > 0,
+          fingerID: apiData.fingerID,
+          st_Image: apiData.st_Image,
+          facYearSem_ID: apiData.facYearSem_ID,
+        }
+
+        setStudent(mappedStudent)
+      } catch (error) {
+        console.error("❌ Error loading student data:", error)
+      }
+    }
+
+    loadData()
+  }, [])
+
+  const handleFingerprintScan = async () => {
+    setIsFingerprintScanning(true)
+    try {
+      const result = await matchFingerprint()
+      alert(result.message)
+    } catch (error) {
+      alert(t("Failed to scan fingerprint."))
+      console.error(error)
+    } finally {
+      setIsFingerprintScanning(false)
+    }
+  }
+
   return (
     <div className="profile-layout">
       <div className="profile-header">

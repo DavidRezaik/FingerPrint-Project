@@ -1,15 +1,66 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { FaChartBar } from "react-icons/fa"
+import { fetchCourseAttendance, fetchFingerprintLogs } from "../services/studentService"
+import { useLanguage } from "../contexts/LanguageContext"
 
-function CourseAttendanceTab({
-  t,
-  courseFilter,
-  setCourseFilter,
-  handleGenerateReport,
-  filteredCourses,
-  fingerprintLogs,
-}) {
+function CourseAttendanceTab({ searchQuery }) {
+  const { t } = useLanguage()
+
+  const [courses, setCourses] = useState([])
+  const [fingerprintLogs, setFingerprintLogs] = useState([])
+  const [courseFilter, setCourseFilter] = useState("all")
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [courseList, logs] = await Promise.all([fetchCourseAttendance(), fetchFingerprintLogs()])
+
+        setCourses(courseList)
+        setFingerprintLogs(logs)
+      } catch (error) {
+        console.error("❌ Error loading course attendance data:", error)
+      }
+    }
+
+    loadData()
+  }, [])
+
+  const handleGenerateReport = () => {
+    const reportData = {
+      totalCourses: courses.length,
+      date: new Date().toLocaleDateString(),
+    }
+
+    alert(`Attendance Report Generated:\n\nTotal Courses: ${reportData.totalCourses}\nDate: ${reportData.date}`)
+  }
+
+  const filteredCourses = courses.filter((course) => {
+    const matchesSearch =
+      searchQuery === "" ||
+      course.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.courseCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.instructor?.toLowerCase().includes(searchQuery.toLowerCase())
+
+    let matchesFilter = true
+    if (courseFilter === "low") {
+      const logsForCourse = fingerprintLogs.filter((log) => log.courseCode === course.courseCode)
+      const successLogs = logsForCourse.filter((log) => log.result === "Success").length
+      const totalSessions = logsForCourse.length || 1
+      const attendancePercent = Math.round((successLogs / totalSessions) * 100)
+      matchesFilter = attendancePercent < 75
+    } else if (courseFilter === "good") {
+      const logsForCourse = fingerprintLogs.filter((log) => log.courseCode === course.courseCode)
+      const successLogs = logsForCourse.filter((log) => log.result === "Success").length
+      const totalSessions = logsForCourse.length || 1
+      const attendancePercent = Math.round((successLogs / totalSessions) * 100)
+      matchesFilter = attendancePercent >= 75
+    }
+
+    return matchesSearch && matchesFilter
+  })
+
   return (
     <div className="section-layout">
       <div className="section-header">

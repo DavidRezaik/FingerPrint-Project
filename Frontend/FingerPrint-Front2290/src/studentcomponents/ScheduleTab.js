@@ -1,6 +1,43 @@
 "use client"
 
-function ScheduleTab({ t, activeDay, setActiveDay, TimeTable }) {
+import { useState, useEffect } from "react"
+import { fetchTimeTable } from "../services/studentService"
+import { useLanguage } from "../contexts/LanguageContext"
+
+function ScheduleTab() {
+  const { t } = useLanguage()
+
+  const [TimeTable, setTimeTable] = useState([])
+  const [activeDay, setActiveDay] = useState(() => {
+    return new Date().toLocaleDateString("en-US", { weekday: "long" })
+  })
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const userString = localStorage.getItem("email")
+        if (!userString) return
+
+        let email = null
+        try {
+          const parsed = JSON.parse(userString)
+          email = typeof parsed === "object" && parsed.email ? parsed.email : parsed
+        } catch {
+          email = userString
+        }
+
+        if (!email || email.trim() === "") return
+
+        const table = await fetchTimeTable(email)
+        setTimeTable(table)
+      } catch (error) {
+        console.error("❌ Error loading schedule data:", error)
+      }
+    }
+
+    loadData()
+  }, [])
+
   return (
     <div className="section-layout">
       <div className="section-header">
