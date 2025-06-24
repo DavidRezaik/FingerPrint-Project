@@ -1,131 +1,187 @@
-// src/services/studentService.js
-// ✅ mock API responses until backend is ready
-const API_BASE_URL = "https://localhost:7069";
-export const fetchStudentProfile = async () => {
+import axios from 'axios';
+import config from "../config"
+
+// At the top of your studentService.js file
+const API_BASE_URL = config.BASE_URL;// Make sure this is correct
+console.log("🔧 API_BASE_URL is set to:", API_BASE_URL);
+
+export const fetchStudentProfile = async (email) => {
+  // Validate email before making the request
+  if (!email || email === 'undefined' || email.trim() === '') {
+    console.log("⚠️ No valid email provided to fetchStudentProfile");
+    return null; // Return null instead of throwing an error
+  }
+
   try {
-    const response = await fetch(`${API_BASE_URL}/api/Studets/GetAllStudets`, {
-      method: "GET",
+    const fullUrl = `${API_BASE_URL}/api/Studets/GetStudetByEmail?Email=${encodeURIComponent(email)}`;
+    console.log("🔍 Full URL being called:", fullUrl);
+
+    const response = await fetch(fullUrl, {
+      method: 'GET',
       headers: {
-        "Content-Type": "application/json"
+        "accept": "text/plain"
       }
     });
 
-    if (!response.ok) throw new Error("Failed to fetch doctor profile");
+    console.log("📡 Response status:", response.status);
 
-    const data = await response.json();
-
-    if (Array.isArray(data) && data.length > 0) {
-      const doc = data[0]; // get the first doctor — you can change logic here
-
-      return {
-        displayName: doc.st_NameEn,
-        email: doc.st_Email,
-        department: doc.faculty,
-        year: doc.facYearSem_ID,
-        gpa: 3.4,
-        fingerprintRegistered: true
-      };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log("❌ Error response body:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
     }
 
-    throw new Error("No doctor profile found.");
+    const data = await response.text();
+    console.log("✅ Raw response:", data);
+
+    try {
+      return JSON.parse(data);
+    } catch {
+      return data;
+    }
   } catch (error) {
-    console.error("Error fetching doctor profile:", error);
-    return null;
+    console.error("❌ Error fetching student profile:", error);
+    throw error;
   }
 };
-  
-  // Example API: fetchTimetable with courseCode
-export const fetchTimeTable = async () => {
+//---------------------------------------------------------------------------------------
+
+
+export const fetchTimeTable = async (email) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/Subjects/GetAllSubjects`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json"
+    const response = await axios.get(
+      `${API_BASE_URL}/api/Studets/DashBordStudets?Email=${email}`,
+      {
+        headers: {
+          "Content-Type": "application/json"
+        }
       }
-    });
+    );
 
-    if (!response.ok) throw new Error("Failed to fetch doctor profile");
-
-    const data = await response.json();
-
-    if (Array.isArray(data) && data.length > 0) {
-      const doc = data[0]; // you can change logic here
-
-      // ✅ Wrap in array
-      return [{
-        courseCode:"CS201",
-        course: doc.sub_Name,
-        day: "Sunday",
-        time: "09:00 AM - 10:30 AM",
-        instructor:doc.instructors,
-        location: "Hall 1"
-      }];
+    if (!response.data || !Array.isArray(response.data)) {
+      throw new Error("Invalid data structure received from API");
     }
 
-    throw new Error("No doctor profile found.");
+    if (response.data.length === 0) {
+      return []; // No timetable
+    }
+
+    // You may adjust mapping here if needed based on actual timetable schema
+    const schedule = response.data.map(item => ({
+      day: "Sunday", // 🔧 TEMP — replace this with correct `item.day` when available
+      courseCode: item.st_Code,
+      course: item.st_NameEn,
+      instructor: "Dr. Smith", // 🔧 TEMP
+      location: "Room 101",    // 🔧 TEMP
+      time: "08:00 AM - 10:00 AM", // 🔧 TEMP
+      studentsCount: 25        // 🔧 TEMP
+    }));
+
+    return schedule;
+
   } catch (error) {
-    console.error("Error fetching doctor profile:", error);
+    console.error("Error fetching timetable:", error);
     return [];
   }
 };
 
-  
-  export const fetchAttendanceSummary = async () => {
-    return {
-      total: 30,
-      attended: 26,
-      missed: 4,
-      percentage: 86.6
-    };
-  };
-  
-  export const fetchFingerprintLogs = async () => {
-    return [
-      { date: "2025-05-05", time: "09:00 AM", location: "Main Gate", result: "Success", courseCode: "CS201" },
-      { date: "2025-05-05", time: "01:05 PM", location: "Main Gate", result: "Success", courseCode: "CS303" },
-      { date: "2025-05-04", time: "08:55 AM", location: "Library", result: "Failed", courseCode: "CS305" }
-    ];
-  };
-  
-  
-  export const matchFingerprint = async () => {
-    const success = Math.random() > 0.2;
-    return {
-      success,
-      message: success ? "Fingerprint matched ✅" : "Fingerprint not matched ❌"
-    };
-  };
 
- export const fetchCourseAttendance = async () => {
+//---------------------------------------------------------------------------------------
+
+
+
+export const fetchCourseAttendance = async (id) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/Subjects/GetAllSubjects`, {
-      method: "GET",
+    const response = await axios.get(
+      `${API_BASE_URL}/api/Subjects/${id}`,
+      {
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    if (!response.data || !Array.isArray(response.data)) {
+      throw new Error("Invalid data structure received from API");
+    }
+
+    if (response.data.length === 0) {
+      return []; // لا توجد بيانات، نرجع مصفوفة فارغة
+    }
+
+    // تحويل كل عنصر في المصفوفة إلى كائن حضور المادة المطلوب
+    const courseAttendance = response.data.map(item => ({
+      courseCode: item.subCode,
+      name: item.subName,
+      instructor: item.doctor,
+      credit: item.credit,
+      status: item.status
+    }));
+
+    return courseAttendance;
+
+  } catch (error) {
+    console.error("Error fetching course attendance:", error);
+    return [];
+  }
+};
+
+//---------------------------------------------------------------------------------------
+
+
+
+export const fetchAttendanceSummary = async () => {
+  return {
+    total: 30,
+    attended: 26,
+    missed: 4,
+    percentage: 86.6
+  };
+};
+
+export const fetchFingerprintLogs = async () => {
+  try {
+    // جلب سجلات البصمة
+    const logsResponse = await axios.get(`${API_BASE_URL}/api/FingerprintLogs/GetAllFingerprintLogs`, {
       headers: {
         "Content-Type": "application/json"
       }
     });
 
-    if (!response.ok) throw new Error("Failed to fetch doctor profile");
+    if (!logsResponse.data) throw new Error("Failed to fetch fingerprint logs");
 
-    const data = await response.json();
+    const logsData = logsResponse.data;
 
-    if (Array.isArray(data) && data.length > 0) {
-      const doc = data[0]; // you can change logic here
+    // جلب تفاصيل الكورسات
+    const courseResponse = await axios.get(`${API_BASE_URL}/api/Attendance/GetAllSubjects`, {
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
 
-      // ✅ Wrap in array
-      return [{
-        courseCode:"CS201",
-        name:doc.sub_Name,
-        instructor:doc.instructors,
-        credit: 4,
-        status:"Ongoing",
-      }];
-    } 
+    if (!courseResponse.data) throw new Error("Failed to fetch course details");
 
-    throw new Error("No doctor profile found.");
+    const courseData = courseResponse.data;
+
+    // دمج البيانات وتنسيقها
+    return logsData.map((log, index) => ({
+      date: log.date || "2025-05-05",
+      time: log.time || "09:00 AM",
+      location: log.location || "Main Gate",
+      result: log.result || "Success",
+      courseCode: courseData[index]?.subCode || "CS201"
+    }));
   } catch (error) {
-    console.error("Error fetching doctor profile:", error);
+    console.error("Error fetching fingerprint logs:", error);
     return [];
   }
 };
-  
+
+export const matchFingerprint = async () => {
+  const success = Math.random() > 0.2;
+  return {
+    success,
+    message: success ? "Fingerprint matched ✅" : "Fingerprint not matched ❌"
+  };
+};
+
