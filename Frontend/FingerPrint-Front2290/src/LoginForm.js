@@ -30,7 +30,7 @@ function LoginForm() {
     error: "#e74c3c",
   };
 
-  const [signIn, setSignIn] = useState(true); // true = student, false = doctor
+  const [signIn, setSignIn] = useState(true);
   const navigate = useNavigate();
   const { t, toggleLanguage, language } = useLanguage();
   const [email, setEmail] = useState("");
@@ -56,7 +56,6 @@ function LoginForm() {
       return;
     }
 
-    // ✅ API Login for Student or Doctor
     try {
       const res = await fetch(`${config.BASE_URL}/api/account/login`, {
         method: "POST",
@@ -74,7 +73,6 @@ function LoginForm() {
         return;
       }
 
-      // ✅ Ensure correct user type is logging in
       if (signIn && data.userType !== "Student") {
         setError(t("❌ This account is not a student."));
         return;
@@ -84,14 +82,16 @@ function LoginForm() {
         return;
       }
 
-      // ✅ Store user and navigate
-      localStorage.setItem("email", JSON.stringify(email));
-      console.log("✅ Saved user to localStorage:", email);
-
-      if (data.userType === "Student") navigate("/dashboard");
-      else if (data.userType === "Doctor") navigate("/doctor-dashboard");
-      else navigate("/");
-
+      // ✅ Store user email for student
+      if (data.userType === "Student") {
+        localStorage.setItem("email", JSON.stringify(email));  // ⬅️ إصلاح التخزين
+        navigate("/dashboard");
+      } else if (data.userType === "Doctor") {
+        localStorage.setItem("doctorEmail", email);
+        navigate("/doctor-dashboard");
+      } else {
+        navigate("/");
+      }
     } catch (err) {
       console.error("Login error:", err);
       setError("❌ Server error. Try again.");

@@ -31,7 +31,6 @@ function ScheduleTab() {
         const table = await fetchTimeTable(email);
         setTimeTable(table);
 
-        // ✅ Automatically show first available day
         if (table.length > 0) {
           setActiveDay(table[0].day);
         }
@@ -43,6 +42,7 @@ function ScheduleTab() {
     loadData();
   }, []);
 
+  const allDays = ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
 
   return (
     <div className="section-layout">
@@ -53,7 +53,7 @@ function ScheduleTab() {
 
       <div className="schedule-calendar">
         <div className="day-selector">
-          {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => (
+          {allDays.map((day) => (
             <button
               key={day}
               onClick={() => setActiveDay(day)}
@@ -69,11 +69,8 @@ function ScheduleTab() {
             const daySessions = TimeTable.filter((session) => session.day === activeDay)
             daySessions.sort((a, b) => {
               const parseTime = (time) => {
-                const [timeStr, modifier] = time.split(" ")
-                let [hours, minutes] = timeStr.split(":").map(Number)
-                if (modifier === "PM" && hours !== 12) hours += 12
-                if (modifier === "AM" && hours === 12) hours = 0
-                return hours * 60 + minutes
+                let [h, m] = time.split(":").map(Number);
+                return h * 60 + m;
               }
               return parseTime(a.time.split(" - ")[0]) - parseTime(b.time.split(" - ")[0])
             })
@@ -109,7 +106,7 @@ function ScheduleTab() {
                             <strong>{t("Instructor")}:</strong> {session.instructor || "TBD"}
                           </span>
                           <span>
-                            <strong>{t("Location")}:</strong> {session.location || t("Main Campus")}
+                            <strong>{t("Room")}:</strong> {session.location || t("Main Campus")}
                           </span>
                         </div>
                       </div>
