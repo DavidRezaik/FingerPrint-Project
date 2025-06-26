@@ -28,7 +28,7 @@ import {
   fetchFingerprintLogs,
   matchFingerprint,
   fetchCourseAttendance,
-  fetchStudentNotifications 
+  fetchStudentNotifications,
 } from "./services/studentService"
 
 import "./dashboard.css"
@@ -42,8 +42,9 @@ import FingerprintLogTab from "./studentcomponents/FingerprintLogTab"
 import ScheduleTab from "./studentcomponents/ScheduleTab"
 import NotificationsTab from "./studentcomponents/NotificationsTab"
 import SettingsTab from "./studentcomponents/SettingsTab"
+import config from "./config"
 
-const profile = await fetchStudentProfile()
+const BASE_URL = config.BASE_URL
 
 function StudentDashboard() {
   const navigate = useNavigate()
@@ -68,10 +69,9 @@ function StudentDashboard() {
   const [activeDay, setActiveDay] = useState(() => {
     return new Date().toLocaleDateString("en-US", { weekday: "long" })
   })
-const [notifications, setNotifications] = useState([])
+  const [notifications, setNotifications] = useState([])
 
   const [isFingerprintScanning, setIsFingerprintScanning] = useState(false)
-
   const [logResultFilter, setLogResultFilter] = useState("all")
   const [logLocationFilter, setLogLocationFilter] = useState("all")
   const [courseFilter, setCourseFilter] = useState("all")
@@ -99,6 +99,7 @@ const [notifications, setNotifications] = useState([])
           return
         }
 
+        // جلب بيانات الطالب
         const profileData = await fetchStudentProfile(email)
         if (!profileData) {
           console.log("ℹ️ No profile data returned")
@@ -107,7 +108,7 @@ const [notifications, setNotifications] = useState([])
 
         const apiData = Array.isArray(profileData) ? profileData[0] : profileData
 
-        const mappedStudent = {
+        setStudent({
           id: apiData.id,
           displayName: apiData.st_NameEn || apiData.st_NameAr || "Unknown",
           st_NameAr: apiData.st_NameAr,
@@ -122,26 +123,31 @@ const [notifications, setNotifications] = useState([])
           fingerID: apiData.fingerID,
           st_Image: apiData.st_Image,
           facYearSem_ID: apiData.facYearSem_ID,
-        }
+        })
 
-      setStudent(mappedStudent)
+        // جلب الكورسات المرتبطة بسنة/سمستر الطالب فقط
+        const allCoursesRes = await fetch(`${BASE_URL}/api/Subjects/GetAllSubjects`)
+        const allCourses = await allCoursesRes.json()
+        const myCourses = allCourses.filter(
+          (c) => Number(c.facYearSem_ID) === Number(apiData.facYearSem_ID)
+        )
+        setCourses(myCourses)
 
-const notificationsList = await fetchStudentNotifications(mappedStudent.facYearSem_ID)
-setNotifications(notificationsList)
+        // باقي البيانات
+        const [table, summary, logs] = await Promise.all([
+          fetchTimeTable(email),
+          fetchAttendanceSummary(),
+          fetchFingerprintLogs(),
+        ])
+        setTimeTable(table)
+        setAttendanceSummary(summary)
+        setFingerprintLogs(logs)
 
-const [table, summary, logs, courseList] = await Promise.all([
-  fetchTimeTable(email),
-  fetchAttendanceSummary(),
-  fetchFingerprintLogs(),
-  fetchCourseAttendance()
-])
+        // إشعارات الطالب
+        const notificationsList = await fetchStudentNotifications(apiData.facYearSem_ID)
+        setNotifications(notificationsList)
 
-setTimeTable(table)
-setAttendanceSummary(summary)
-setFingerprintLogs(logs)
-setCourses(courseList)
-
-
+        // تحقق من مسح البصمة اليوم
         const today = new Date().toISOString().slice(0, 10)
         const scannedToday = logs.some((log) => log.date === today && log.result === "Success")
         setFingerprintTodayScanned(scannedToday)
@@ -190,24 +196,23 @@ setCourses(courseList)
   }
 
   const handleMarkNotificationRead = (index) => {
-  const updated = [...notifications]
-  const note = updated[index]
+    const updated = [...notifications]
+    const note = updated[index]
 
-  updated[index].isRead = !note.isRead
-  setNotifications(updated)
+    updated[index].isRead = !note.isRead
+    setNotifications(updated)
 
-  const key = "readNotifications"
-  let stored = JSON.parse(localStorage.getItem(key) || "[]")
+    const key = "readNotifications"
+    let stored = JSON.parse(localStorage.getItem(key) || "[]")
 
-  if (updated[index].isRead) {
-    stored = [...new Set([...stored, note.id])]
-  } else {
-    stored = stored.filter((id) => id !== note.id)
+    if (updated[index].isRead) {
+      stored = [...new Set([...stored, note.id])]
+    } else {
+      stored = stored.filter((id) => id !== note.id)
+    }
+
+    localStorage.setItem(key, JSON.stringify(stored))
   }
-
-  localStorage.setItem(key, JSON.stringify(stored))
-}
-
 
   const handleMarkAllNotificationsRead = () => {
     setNotifications((prev) => prev.map((notification) => ({ ...notification, isRead: true })))
@@ -245,7 +250,7 @@ setCourses(courseList)
   const tabs = [
     { id: "dashboard", label: t("Dashboard"), icon: <FaHome /> },
     { id: "profile", label: t("Profile"), icon: <FaUser /> },
-  { id: "courses", label: t("Courses"), icon: <FaBook /> }, 
+    { id: "courses", label: t("Courses"), icon: <FaBook /> },
     { id: "fingerprintLog", label: t("Fingerprint Log"), icon: <FaFingerprint /> },
     { id: "schedule", label: t("Schedule"), icon: <FaCalendarAlt /> },
     {
@@ -270,7 +275,8 @@ setCourses(courseList)
       log.courseCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       log.result.toLowerCase().includes(searchQuery.toLowerCase())
 
-    const matchesResult = logResultFilter === "all" || log.result.toLowerCase() === logResultFilter.toLowerCase()
+    const matchesResult =
+      logResultFilter === "all" || log.result.toLowerCase() === logResultFilter.toLowerCase()
 
     const matchesLocation =
       logLocationFilter === "all" || log.location.toLowerCase().includes(logLocationFilter.toLowerCase())

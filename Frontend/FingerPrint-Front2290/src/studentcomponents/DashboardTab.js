@@ -15,6 +15,14 @@ function DashboardTab({
   handleFingerprintScan,
   isFingerprintScanning,
 }) {
+  // 🟢 تحديد هل البصمة متسجلة حسب fingerID
+  const isScanned =
+    student &&
+    student.fingerID !== undefined &&
+    student.fingerID !== null &&
+    student.fingerID !== 0 &&
+    student.fingerID !== "0"
+
   return (
     <div className="dashboard-layout">
       <div className="dashboard-header">
@@ -50,8 +58,8 @@ function DashboardTab({
         <div
           className="stat-card"
           onClick={() => {
-            setActiveTab("courseAttendance")
-            localStorage.setItem("courseFilter", "low") // ✅ فلتر تلقائي للـ "Low Attendance"
+            setActiveTab("courseAttendanceTab")
+            localStorage.setItem("courseFilter", "low")
           }}
           style={{ cursor: "pointer" }}
         >
@@ -61,19 +69,21 @@ function DashboardTab({
           <div className="stat-info">
             <h3>{t("Active Courses")}</h3>
             <div className="stat-value">{courses.length}</div>
-            <div className="stat-detail">
-              <span>
-                {
-                  courses.filter((c) => {
-                    const logsForCourse = fingerprintLogs.filter((log) => log.courseCode === c.courseCode)
-                    const successLogs = logsForCourse.filter((log) => log.result === "Success").length
-                    const totalSessions = logsForCourse.length || 1
-                    const attendancePercent = Math.round((successLogs / totalSessions) * 100)
-                    return attendancePercent < 75
-                  }).length
-                }{" "}
-                {t("need attention")}
-              </span>
+            {/* فقط عرض رسالة لو لا يوجد مواد */}
+            <div className="stat-detail" style={{ fontSize: 14, color: "#444", marginTop: 5 }}>
+              {courses.length === 0 && <span>{t("No active courses")}</span>}
+            </div>
+            <div className="stat-detail" style={{ color: "#e87c13", marginTop: 3 }}>
+              {
+                courses.filter((c) => {
+                  const logsForCourse = fingerprintLogs.filter((log) => log.courseCode === c.courseCode)
+                  const successLogs = logsForCourse.filter((log) => log.result === "Success").length
+                  const totalSessions = logsForCourse.length || 1
+                  const attendancePercent = Math.round((successLogs / totalSessions) * 100)
+                  return attendancePercent < 75
+                }).length
+              }
+              {" "}{t("need attention")}
             </div>
           </div>
         </div>
@@ -81,26 +91,36 @@ function DashboardTab({
         {/* Fingerprint Status Card */}
         <div
           className="stat-card"
-          onClick={() => setActiveTab("fingerprintLog")}
-          style={{ cursor: "pointer" }}
+          onClick={() => {
+            if (!isScanned) setActiveTab("fingerprintLog")
+          }}
+          style={{
+            cursor: !isScanned ? "pointer" : "default",
+            border: !isScanned ? "2px dashed #f26b51" : undefined,
+            background: !isScanned ? "#fff8f3" : undefined,
+          }}
         >
           <div className="stat-icon fingerprint">
             <FaFingerprint />
           </div>
           <div className="stat-info">
             <h3>{t("Fingerprint Status")}</h3>
-            <div className="stat-value">
-              {fingerprintTodayScanned ? t("Scanned Today") : t("Not Scanned")}
+            <div
+              className="stat-value"
+              style={{
+                color: isScanned ? "#21a75c" : "#e87c13",
+              }}
+            >
+              {isScanned ? t("Scanned") : t("Not Scanned")}
             </div>
             <div className="stat-detail">
-              {!fingerprintTodayScanned && (
-                <button
-                  onClick={handleFingerprintScan}
-                  className="scan-btn"
-                  disabled={isFingerprintScanning}
-                >
-                  {isFingerprintScanning ? t("Scanning...") : t("Scan Now")}
-                </button>
+              {!isScanned && (
+                <div style={{ marginTop: 10 }}>
+                  <span style={{ color: "#e87c13" }}>
+                    {t("You have not registered your fingerprint yet.")}
+                  </span>
+                  <br />
+                </div>
               )}
             </div>
           </div>
