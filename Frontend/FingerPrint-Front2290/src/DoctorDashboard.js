@@ -4,9 +4,11 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import {
+  FaUser,
   FaChartBar,
   FaBook,
   FaCalendarAlt,
+  FaCog,
   FaBars,
   FaMoon,
   FaSun,
@@ -16,11 +18,10 @@ import {
   FaKey,
   FaSignOutAlt,
   FaSearch,
+  FaHome,
   FaClipboardList,
   FaFileAlt,
   FaUsers,
-  FaPlus,
-  FaTrashAlt,
 } from "react-icons/fa"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -30,21 +31,7 @@ import {
   fetchAttendanceStats,
   fetchStudentsList,
   fetchGradeDistribution,
-  addOrUpdateDoctor,
-  deleteDoctor,
 } from "./services/doctorService"
-
-// Import data modules
-import { dashboardData } from "./doctorcomponents/dashboardData"
-import { profileData } from "./doctorcomponents/profileData"
-import { coursesData } from "./doctorcomponents/coursesData"
-import { studentsData } from "./doctorcomponents/studentsData"
-import { doctorsManagementData } from "./doctorcomponents/doctorsManagementData"
-import { attendanceData } from "./doctorcomponents/attendanceData"
-import { scheduleData } from "./doctorcomponents/scheduleData"
-import { settingsData } from "./doctorcomponents/settingsData"
-import { navigationData } from "./doctorcomponents/navigationData"
-
 import "./dashboard.css"
 
 function DoctorDashboard() {
@@ -67,14 +54,6 @@ function DoctorDashboard() {
   const [students, setStudents] = useState([])
   const [gradeDistribution, setGradeDistribution] = useState({})
 
-  // New states for managing doctor/faculty CRUD operations
-  const [showAddDoctorForm, setShowAddDoctorForm] = useState(false)
-  const [editingDoctor, setEditingDoctor] = useState(null)
-  const [newDoctorData, setNewDoctorData] = useState(doctorsManagementData.getInitialFormData())
-
-  // API URL state
-  const [apiUrl, setApiUrl] = useState(process.env.REACT_APP_API_URL || "https://your-backend-api.com/api")
-
   // Loading states
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [loadingCourses, setLoadingCourses] = useState(true)
@@ -82,8 +61,6 @@ function DoctorDashboard() {
   const [loadingAttendance, setLoadingAttendance] = useState(true)
   const [loadingStudents, setLoadingStudents] = useState(true)
   const [loadingGrades, setLoadingGrades] = useState(true)
-  const [loadingDoctorCrud, setLoadingDoctorCrud] = useState(false)
-  const [errorDoctorCrud, setErrorDoctorCrud] = useState(null)
 
   // Error states
   const [errorProfile, setErrorProfile] = useState(null)
@@ -92,9 +69,6 @@ function DoctorDashboard() {
   const [errorAttendance, setErrorAttendance] = useState(null)
   const [errorStudents, setErrorStudents] = useState(null)
   const [errorGrades, setErrorGrades] = useState(null)
-
-  // Get navigation data
-  const tabs = navigationData.getTabs()
 
   // Load data function
   const loadData = async () => {
@@ -113,35 +87,35 @@ function DoctorDashboard() {
       setErrorGrades(null)
 
       const [profile, coursesData, scheduleData, attendanceData, studentsData, gradeData] = await Promise.all([
-        fetchDoctorProfile(apiUrl).catch((err) => {
+        fetchDoctorProfile().catch((err) => {
           throw new Error("Profile: " + err.message)
         }),
-        fetchCourses(apiUrl).catch((err) => {
+        fetchCourses().catch((err) => {
           throw new Error("Courses: " + err.message)
         }),
-        fetchSchedule(apiUrl).catch((err) => {
+        fetchSchedule().catch((err) => {
           throw new Error("Schedule: " + err.message)
         }),
-        fetchAttendanceStats(apiUrl).catch((err) => {
+        fetchAttendanceStats().catch((err) => {
           throw new Error("Attendance: " + err.message)
         }),
-        fetchStudentsList(apiUrl).catch((err) => {
+        fetchStudentsList().catch((err) => {
           throw new Error("Students: " + err.message)
         }),
-        fetchGradeDistribution(apiUrl).catch((err) => {
+        fetchGradeDistribution().catch((err) => {
           throw new Error("Grades: " + err.message)
         }),
       ])
 
-      setDoctor(profile)
-      setCourses(coursesData)
-      setSchedule(scheduleData)
-      setAttendanceStats(attendanceData)
-      setStudents(studentsData)
-      setGradeDistribution(gradeData)
+      setDoctor(profile || {})
+      setCourses(coursesData || [])
+      setSchedule(scheduleData || [])
+      setAttendanceStats(attendanceData || {})
+      setStudents(studentsData || [])
+      setGradeDistribution(gradeData || {})
 
       // Set default selected course
-      if (coursesData.length > 0) {
+      if (coursesData && coursesData.length > 0) {
         setSelectedCourse(coursesData[0].courseCode)
       }
     } catch (error) {
@@ -176,10 +150,11 @@ function DoctorDashboard() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [apiUrl])
+  }, [])
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to logout?")) {
+      localStorage.removeItem("email")
       navigate("/")
     }
   }
@@ -190,64 +165,51 @@ function DoctorDashboard() {
     setLanguage(language === "english" ? "arabic" : "english")
   }
 
-  // Handler for adding/updating a doctor
-  const handleAddOrUpdateDoctor = async (e) => {
-    e.preventDefault()
-    setLoadingDoctorCrud(true)
-    setErrorDoctorCrud(null)
-
-    const doctorToSubmit = doctorsManagementData.prepareDoctorData(newDoctorData)
-
-    try {
-      await addOrUpdateDoctor(apiUrl, doctorToSubmit)
-      alert(editingDoctor ? "Doctor updated successfully!" : "Doctor added successfully!")
-      setShowAddDoctorForm(false)
-      setEditingDoctor(null)
-      setNewDoctorData(doctorsManagementData.getInitialFormData())
-      loadData()
-    } catch (error) {
-      setErrorDoctorCrud(error.message)
-      console.error("CRUD Error:", error)
-    } finally {
-      setLoadingDoctorCrud(false)
-    }
-  }
-
-  // Handler for deleting a doctor
-  const handleDeleteDoctor = async (doctorId) => {
-    if (window.confirm(`Are you sure you want to delete doctor with ID: ${doctorId}?`)) {
-      setLoadingDoctorCrud(true)
-      setErrorDoctorCrud(null)
-      try {
-        await deleteDoctor(apiUrl, doctorId)
-        alert("Doctor deleted successfully!")
-        loadData()
-      } catch (error) {
-        setErrorDoctorCrud(error.message)
-        console.error("CRUD Error:", error)
-      } finally {
-        setLoadingDoctorCrud(false)
-      }
-    }
-  }
-
-  const handleEditDoctorClick = (doctor) => {
-    setEditingDoctor(doctor)
-    setNewDoctorData(doctorsManagementData.populateFormData(doctor))
-    setShowAddDoctorForm(true)
-  }
+  const tabs = [
+    { id: "dashboard", label: "Dashboard", icon: <FaHome /> },
+    { id: "profile", label: "Profile", icon: <FaUser /> },
+    { id: "courses", label: "Courses", icon: <FaBook /> },
+    { id: "students", label: "Students", icon: <FaUsers /> },
+    { id: "attendance", label: "Attendance", icon: <FaClipboardList /> },
+    { id: "schedule", label: "Schedule", icon: <FaCalendarAlt /> },
+    { id: "settings", label: "Settings", icon: <FaCog /> },
+  ]
 
   // Get breadcrumb title based on active tab
-  const getBreadcrumbTitle = () => navigationData.getBreadcrumbTitle(activeTab, tabs)
+  const getBreadcrumbTitle = () => {
+    const tab = tabs.find((t) => t.id === activeTab)
+    return tab ? tab.label : ""
+  }
 
   // Filter students based on search query
-  const filteredStudents = studentsData.filterStudents(students, searchQuery)
+  const filteredStudents = students.filter(
+    (student) =>
+      student.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.email?.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
 
   // Filter courses based on search query
-  const filteredCourses = coursesData.filterCourses(courses, searchQuery)
+  const filteredCourses = courses.filter(
+    (course) =>
+      course.courses?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.courseCode?.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
 
   // Filter schedule based on selected day
-  const filteredSchedule = scheduleData.filterSchedule(schedule, selectedDay)
+  const filteredSchedule = selectedDay === "All" ? schedule : schedule.filter((item) => item.day === selectedDay)
+
+  // Helper function to get day name from day number
+  const getDayName = (dayNumber) => {
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    return days[dayNumber] || "Unknown"
+  }
+
+  // Helper function to format time
+  const formatTime = (timeString) => {
+    if (!timeString) return ""
+    return timeString.substring(0, 5) // Remove seconds, keep HH:MM
+  }
 
   // Display loading or error messages
   const renderLoadingOrError = () => {
@@ -326,7 +288,7 @@ function DoctorDashboard() {
           <div className="header-right" ref={profileDropdownRef}>
             <div className="profile-dropdown" onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}>
               <div className="profile-info">
-                <div className="profile-avatar">{profileData.getProfileInitials(doctor.name)}</div>
+                <div className="profile-avatar">{doctor.name?.charAt(0) || "D"}</div>
                 <span className="profile-name">{doctor.name || "Doctor"}</span>
                 <FaChevronDown className="dropdown-icon" />
               </div>
@@ -334,7 +296,7 @@ function DoctorDashboard() {
               {profileDropdownOpen && (
                 <div className="dropdown-menu">
                   <div className="dropdown-header">
-                    <div className="dropdown-avatar">{profileData.getProfileInitials(doctor.name)}</div>
+                    <div className="dropdown-avatar">{doctor.name?.charAt(0) || "D"}</div>
                     <div className="dropdown-user-info">
                       <h4>{doctor.name || "Doctor"}</h4>
                       <p>{doctor.email || "email@example.com"}</p>
@@ -387,15 +349,13 @@ function DoctorDashboard() {
                 transition={{ duration: 0.4 }}
                 className="tab-content"
               >
-                {renderLoadingOrError() ||
-                  (loadingDoctorCrud && <div className="loading-message">Performing action...</div>) ||
-                  (errorDoctorCrud && <div className="error-message">{errorDoctorCrud}</div>)}
+                {renderLoadingOrError()}
 
                 {!loadingProfile && !errorProfile && activeTab === "dashboard" && (
                   <div className="dashboard-layout">
                     <div className="dashboard-header">
-                      <h1>{dashboardData.getWelcomeMessage(doctor.name)}</h1>
-                      <p className="subtitle">{dashboardData.getSubtitle()}</p>
+                      <h1>Welcome back, {doctor.dr_NameEn || doctor.dr_NameAr || "Doctor"}</h1>
+                      <p className="subtitle">Here's an overview of your teaching activities</p>
                     </div>
 
                     <div className="dashboard-stats">
@@ -405,9 +365,9 @@ function DoctorDashboard() {
                         </div>
                         <div className="stat-info">
                           <h3>Active Courses</h3>
-                          <div className="stat-value">{dashboardData.getActiveCoursesCount(courses)}</div>
+                          <div className="stat-value">{courses.length}</div>
                           <div className="stat-detail">
-                            <span>Total: {courses.length} courses</span>
+                            <span>Total courses</span>
                           </div>
                         </div>
                       </div>
@@ -418,7 +378,7 @@ function DoctorDashboard() {
                         </div>
                         <div className="stat-info">
                           <h3>Total Students</h3>
-                          <div className="stat-value">{dashboardData.getTotalStudentsCount(students)}</div>
+                          <div className="stat-value">{students.length}</div>
                           <div className="stat-detail">
                             <span>Across all courses</span>
                           </div>
@@ -431,7 +391,7 @@ function DoctorDashboard() {
                         </div>
                         <div className="stat-info">
                           <h3>Average Attendance</h3>
-                          <div className="stat-value">{dashboardData.getAverageAttendance(attendanceStats)}%</div>
+                          <div className="stat-value">{attendanceStats.averageAttendance || 0}%</div>
                           <div className="stat-detail">
                             <span>Across all courses</span>
                           </div>
@@ -444,7 +404,14 @@ function DoctorDashboard() {
                         </div>
                         <div className="stat-info">
                           <h3>Today's Classes</h3>
-                          <div className="stat-value">{dashboardData.getTodayClassesCount(schedule)}</div>
+                          <div className="stat-value">
+                            {
+                              schedule.filter((s) => {
+                                const today = new Date().getDay()
+                                return s.day === today
+                              }).length
+                            }
+                          </div>
                           <div className="stat-detail">
                             <span>Classes scheduled today</span>
                           </div>
@@ -464,19 +431,21 @@ function DoctorDashboard() {
 
                           <div className="schedule-list">
                             {(() => {
-                              const todaySessions = dashboardData.getTodaySchedule(schedule)
+                              const today = new Date().getDay()
+                              const todaySessions = schedule.filter((session) => session.day === today)
 
                               if (todaySessions.length === 0) {
                                 return <p className="no-data">No classes scheduled for today.</p>
                               }
 
                               return todaySessions.map((session, index) => (
-                                <div key={index} className="schedule-item">
-                                  <div className="schedule-time">{session.startTime}</div>
+                                <div key={`${session.lectureName}-${index}`} className="schedule-item">
+                                  <div className="schedule-time">{formatTime(session.fromTime)}</div>
                                   <div className="schedule-details">
-                                    <h4>{session.courseName}</h4>
+                                    <h4>{session.subjectName}</h4>
                                     <p>
-                                      {session.location} • {session.duration}
+                                      {session.lectureName} • {formatTime(session.fromTime)} -{" "}
+                                      {formatTime(session.toTime)}
                                     </p>
                                   </div>
                                 </div>
@@ -495,9 +464,9 @@ function DoctorDashboard() {
                           value={selectedCourse || ""}
                           onChange={(e) => setSelectedCourse(e.target.value)}
                         >
-                          {courses.map((course) => (
-                            <option key={course.courseCode} value={course.courseCode}>
-                              {course.name}
+                          {courses.map((course, index) => (
+                            <option key={`${course.courseCode}-${index}`} value={course.courseCode}>
+                              {course.courses}
                             </option>
                           ))}
                         </select>
@@ -508,33 +477,36 @@ function DoctorDashboard() {
                           <div className="attendance-metric">
                             <h4>Average Attendance</h4>
                             <div className="metric-value">
-                              {attendanceStats.courseStats?.find((c) => c.courseCode === selectedCourse)
-                                ?.averageAttendance || 0}
+                              {Array.isArray(attendanceStats) && attendanceStats.length > 0
+                                ? attendanceStats[0]?.courseStats?.averageAttendance || 0
+                                : 0}
                               %
                             </div>
                           </div>
                           <div className="attendance-metric">
                             <h4>Last Session</h4>
                             <div className="metric-value">
-                              {attendanceStats.courseStats?.find((c) => c.courseCode === selectedCourse)
-                                ?.lastSessionAttendance || 0}
+                              {Array.isArray(attendanceStats) && attendanceStats.length > 0
+                                ? attendanceStats[0]?.courseStats?.lastSessionAttendance || 0
+                                : 0}
                               %
                             </div>
                           </div>
                           <div className="attendance-metric">
                             <h4>At Risk Students</h4>
                             <div className="metric-value">
-                              {attendanceStats.courseStats?.find((c) => c.courseCode === selectedCourse)
-                                ?.atRiskStudents || 0}
+                              {Array.isArray(attendanceStats) && attendanceStats.length > 0
+                                ? attendanceStats[0]?.courseStats?.atRiskStudents || 0
+                                : 0}
                             </div>
                           </div>
                         </div>
 
                         <div className="attendance-bars">
-                          {attendanceStats.courseStats
-                            ?.find((c) => c.courseCode === selectedCourse)
-                            ?.sessions?.map((session, index) => (
-                              <div key={index} className="attendance-bar-container">
+                          {Array.isArray(attendanceStats) &&
+                            attendanceStats.length > 0 &&
+                            attendanceStats[0]?.courseStats?.sessions?.map((session, index) => (
+                              <div key={`session-${index}`} className="attendance-bar-container">
                                 <div className="attendance-date">{session.date}</div>
                                 <div className="attendance-bar-wrapper">
                                   <div
@@ -554,12 +526,12 @@ function DoctorDashboard() {
                 {!loadingProfile && !errorProfile && activeTab === "profile" && (
                   <div className="profile-layout">
                     <div className="profile-header">
-                      <div className="profile-avatar-large">{profileData.getProfileInitials(doctor.name)}</div>
+                      <div className="profile-avatar-large">
+                        {doctor.dr_NameEn?.charAt(0) || doctor.dr_NameAr?.charAt(0) || "D"}
+                      </div>
                       <div className="profile-header-info">
-                        <h1>{doctor.name}</h1>
-                        <p>
-                          {doctor.title} • {doctor.department}
-                        </p>
+                        <h1>{doctor.dr_NameEn || doctor.dr_NameAr}</h1>
+                        <p>{doctor.faculty}</p>
                       </div>
                       <button className="edit-profile-btn">
                         <FaEdit /> Edit Profile
@@ -570,36 +542,36 @@ function DoctorDashboard() {
                       <div className="profile-section">
                         <h3>Personal Information</h3>
                         <div className="profile-info-grid">
-                          {profileData.getPersonalInfoFields().map((field) => (
-                            <div key={field.key} className="profile-info-item">
-                              <label>{field.label}</label>
-                              <p>{doctor[field.key] || field.fallback || doctor[field.key]}</p>
-                            </div>
-                          ))}
+                          <div className="profile-info-item">
+                            <label>Full Name (English)</label>
+                            <p>{doctor.dr_NameEn || "Not provided"}</p>
+                          </div>
+                          <div className="profile-info-item">
+                            <label>Full Name (Arabic)</label>
+                            <p>{doctor.dr_NameAr || "Not provided"}</p>
+                          </div>
+                          <div className="profile-info-item">
+                            <label>Email Address</label>
+                            <p>{doctor.dr_Email || "Not provided"}</p>
+                          </div>
+                          <div className="profile-info-item">
+                            <label>Doctor Code</label>
+                            <p>{doctor.dr_Code || "Not provided"}</p>
+                          </div>
+                          <div className="profile-info-item">
+                            <label>Phone Number</label>
+                            <p>{doctor.phone || "Not provided"}</p>
+                          </div>
                         </div>
                       </div>
 
                       <div className="profile-section">
                         <h3>Academic Information</h3>
                         <div className="profile-info-grid">
-                          {profileData.getAcademicInfoFields().map((field) => (
-                            <div key={field.key} className="profile-info-item">
-                              <label>{field.label}</label>
-                              <p>{doctor[field.key] || field.fallback || doctor[field.key]}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="profile-section">
-                        <h3>Teaching Summary</h3>
-                        <div className="profile-info-grid">
-                          {profileData.getTeachingSummaryFields(courses, students, doctor).map((field, index) => (
-                            <div key={index} className="profile-info-item">
-                              <label>{field.label}</label>
-                              <p>{field.value}</p>
-                            </div>
-                          ))}
+                          <div className="profile-info-item">
+                            <label>Faculty</label>
+                            <p>{doctor.faculty || "Not provided"}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -616,11 +588,9 @@ function DoctorDashboard() {
                     <div className="data-filters">
                       <div className="filter-group">
                         <select className="filter-select">
-                          {coursesData.getFilterOptions().map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
+                          <option value="all">All Courses</option>
+                          <option value="active">Active Courses</option>
+                          <option value="completed">Completed Courses</option>
                         </select>
                       </div>
 
@@ -630,43 +600,38 @@ function DoctorDashboard() {
                     </div>
 
                     <div className="courses-grid">
-                      {filteredCourses.map((course, index) => {
-                        const courseData = coursesData.getCourseCardData(course)
-                        return (
-                          <div key={index} className={`course-card ${courseData.status.toLowerCase()}`}>
-                            <div className="course-header">
-                              <h3>{courseData.name}</h3>
-                              <span className={`course-status ${courseData.status.toLowerCase()}`}>
-                                {courseData.status}
-                              </span>
-                            </div>
-                            <div className="course-details">
-                              <div className="course-info">
-                                <div className="course-info-item">
-                                  <label>Course Code</label>
-                                  <p>{courseData.courseCode}</p>
-                                </div>
-                                <div className="course-info-item">
-                                  <label>Credit Hours</label>
-                                  <p>{courseData.creditHours}</p>
-                                </div>
-                                <div className="course-info-item">
-                                  <label>Students</label>
-                                  <p>{courseData.studentsCount}</p>
-                                </div>
-                                <div className="course-info-item">
-                                  <label>Average Attendance</label>
-                                  <p>{courseData.averageAttendance}%</p>
-                                </div>
+                      {filteredCourses.map((course, index) => (
+                        <div key={`${course.courseCode}-${index}`} className="course-card active">
+                          <div className="course-header">
+                            <h3>{course.courses}</h3>
+                            <span className="course-status active">{course.status}</span>
+                          </div>
+                          <div className="course-details">
+                            <div className="course-info">
+                              <div className="course-info-item">
+                                <label>Course Code</label>
+                                <p>{course.courseCode}</p>
+                              </div>
+                              <div className="course-info-item">
+                                <label>Credit Hours</label>
+                                <p>{course.creditHours}</p>
+                              </div>
+                              <div className="course-info-item">
+                                <label>Students</label>
+                                <p>{course.studentsCount}</p>
+                              </div>
+                              <div className="course-info-item">
+                                <label>Average Attendance</label>
+                                <p>{course.averageAttendance}%</p>
                               </div>
                             </div>
-                            <div className="course-actions">
-                              <button className="course-action-btn">View Details</button>
-                              <button className="course-action-btn">Attendance</button>
-                            </div>
                           </div>
-                        )
-                      })}
+                          <div className="course-actions">
+                            <button className="course-action-btn">View Details</button>
+                            <button className="course-action-btn">Attendance</button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -682,19 +647,19 @@ function DoctorDashboard() {
                       <div className="filter-group">
                         <select className="filter-select">
                           <option value="all">All Students</option>
-                          {courses.map((course) => (
-                            <option key={course.courseCode} value={course.courseCode}>
-                              {course.name}
+                          {courses.map((course, index) => (
+                            <option key={`${course.courseCode}-filter-${index}`} value={course.courseCode}>
+                              {course.courses}
                             </option>
                           ))}
                         </select>
 
                         <select className="filter-select">
-                          {studentsData.getYearFilterOptions().map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
+                          <option value="all">All Years</option>
+                          <option value="1">1st Year</option>
+                          <option value="2">2nd Year</option>
+                          <option value="3">3rd Year</option>
+                          <option value="4">4th Year</option>
                         </select>
                       </div>
 
@@ -712,136 +677,31 @@ function DoctorDashboard() {
                         <table className="data-table">
                           <thead>
                             <tr>
-                              {studentsData.getTableColumns().map((column) => (
-                                <th key={column}>{column}</th>
-                              ))}
+                              <th>ID</th>
+                              <th>Name</th>
+                              <th>Email</th>
+                              <th>Department</th>
+                              <th>Year</th>
+                              <th>Attendance</th>
+                              <th>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
                             {filteredStudents.map((student, index) => (
-                              <tr key={index}>
+                              <tr key={`student-${student.id}-${index}`}>
                                 <td>{student.id}</td>
                                 <td>{student.name}</td>
                                 <td>{student.email}</td>
                                 <td>{student.department}</td>
                                 <td>{student.year}</td>
                                 <td>
-                                  <span
-                                    className={`status-badge ${studentsData.getAttendanceStatusClass(student.attendance)}`}
-                                  >
+                                  <span className={`status-badge ${student.attendance >= 75 ? "success" : "error"}`}>
                                     {student.attendance}%
                                   </span>
                                 </td>
                                 <td>
                                   <div className="table-actions">
                                     <button className="table-action-btn">View</button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === "doctors-management" && (
-                  <div className="section-layout">
-                    <div className="section-header">
-                      <h1>Doctors Management</h1>
-                      <p className="subtitle">Add, edit, or delete doctor profiles</p>
-                    </div>
-
-                    <div className="data-filters">
-                      <div className="filter-group">{/* Add filters specific to doctors if needed */}</div>
-
-                      <button
-                        className="action-button"
-                        onClick={() => {
-                          setShowAddDoctorForm(true)
-                          setEditingDoctor(null)
-                          setNewDoctorData(doctorsManagementData.getInitialFormData())
-                        }}
-                      >
-                        <FaPlus /> Add New Doctor
-                      </button>
-                    </div>
-
-                    {showAddDoctorForm && (
-                      <div className="form-container">
-                        <h3>{editingDoctor ? "Edit Doctor" : "Add New Doctor"}</h3>
-                        <form onSubmit={handleAddOrUpdateDoctor}>
-                          {doctorsManagementData.getFormFields().map((field) => (
-                            <div key={field.key} className="form-group">
-                              <label>{field.label}:</label>
-                              <input
-                                type={field.type}
-                                value={newDoctorData[field.key]}
-                                onChange={(e) => setNewDoctorData({ ...newDoctorData, [field.key]: e.target.value })}
-                                required={field.required}
-                              />
-                            </div>
-                          ))}
-                          <div className="form-actions">
-                            <button type="submit" className="action-button primary" disabled={loadingDoctorCrud}>
-                              {loadingDoctorCrud
-                                ? editingDoctor
-                                  ? "Updating..."
-                                  : "Adding..."
-                                : editingDoctor
-                                  ? "Update Doctor"
-                                  : "Add Doctor"}
-                            </button>
-                            <button
-                              type="button"
-                              className="action-button secondary"
-                              onClick={() => setShowAddDoctorForm(false)}
-                              disabled={loadingDoctorCrud}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </form>
-                      </div>
-                    )}
-
-                    <div className="data-table-container">
-                      {filteredStudents.length === 0 ? (
-                        <div className="no-data-message">
-                          <p>No doctors found. Try adding one!</p>
-                        </div>
-                      ) : (
-                        <table className="data-table">
-                          <thead>
-                            <tr>
-                              {doctorsManagementData.getTableColumns().map((column) => (
-                                <th key={column}>{column}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredStudents.map((doctorEntry, index) => (
-                              <tr key={index}>
-                                <td>{doctorEntry.id}</td>
-                                <td>{doctorEntry.name}</td>
-                                <td>{doctorEntry.email}</td>
-                                <td>{doctorEntry.department}</td>
-                                <td>{doctorEntry.title || "N/A"}</td>
-                                <td>
-                                  <div className="table-actions">
-                                    <button
-                                      className="table-action-btn"
-                                      onClick={() => handleEditDoctorClick(doctorEntry)}
-                                    >
-                                      <FaEdit /> Edit
-                                    </button>
-                                    <button
-                                      className="table-action-btn delete"
-                                      onClick={() => handleDeleteDoctor(doctorEntry.id)}
-                                    >
-                                      <FaTrashAlt /> Delete
-                                    </button>
                                   </div>
                                 </td>
                               </tr>
@@ -868,9 +728,9 @@ function DoctorDashboard() {
                           onChange={(e) => setSelectedCourse(e.target.value)}
                         >
                           <option value="">Select Course</option>
-                          {courses.map((course) => (
-                            <option key={course.courseCode} value={course.courseCode}>
-                              {course.name}
+                          {courses.map((course, index) => (
+                            <option key={`${course.courseCode}-attendance-${index}`} value={course.courseCode}>
+                              {course.courses}
                             </option>
                           ))}
                         </select>
@@ -889,16 +749,32 @@ function DoctorDashboard() {
                     {selectedCourse ? (
                       <div className="attendance-container">
                         <div className="attendance-overview">
-                          {attendanceData
-                            .getAttendanceMetrics(
-                              attendanceData.getCourseAttendanceStats(attendanceStats, selectedCourse),
-                            )
-                            .map((metric, index) => (
-                              <div key={index} className="attendance-stat-card">
-                                <h3>{metric.title}</h3>
-                                <div className="attendance-stat-value">{metric.value}</div>
-                              </div>
-                            ))}
+                          <div className="attendance-stat-card">
+                            <h3>Average Attendance</h3>
+                            <div className="attendance-stat-value">
+                              {Array.isArray(attendanceStats) && attendanceStats.length > 0
+                                ? attendanceStats[0]?.courseStats?.averageAttendance || 0
+                                : 0}
+                              %
+                            </div>
+                          </div>
+                          <div className="attendance-stat-card">
+                            <h3>Last Session</h3>
+                            <div className="attendance-stat-value">
+                              {Array.isArray(attendanceStats) && attendanceStats.length > 0
+                                ? attendanceStats[0]?.courseStats?.lastSessionAttendance || 0
+                                : 0}
+                              %
+                            </div>
+                          </div>
+                          <div className="attendance-stat-card">
+                            <h3>At Risk Students</h3>
+                            <div className="attendance-stat-value">
+                              {Array.isArray(attendanceStats) && attendanceStats.length > 0
+                                ? attendanceStats[0]?.courseStats?.atRiskStudents || 0
+                                : 0}
+                            </div>
+                          </div>
                         </div>
 
                         <div className="attendance-sessions">
@@ -906,16 +782,20 @@ function DoctorDashboard() {
                           <table className="data-table">
                             <thead>
                               <tr>
-                                {attendanceData.getSessionTableColumns().map((column) => (
-                                  <th key={column}>{column}</th>
-                                ))}
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Location</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                                <th>Percentage</th>
+                                <th>Actions</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {attendanceData
-                                .getCourseAttendanceStats(attendanceStats, selectedCourse)
-                                ?.sessions?.map((session, index) => (
-                                  <tr key={index}>
+                              {Array.isArray(attendanceStats) &&
+                                attendanceStats.length > 0 &&
+                                attendanceStats[0]?.courseStats?.sessions?.map((session, index) => (
+                                  <tr key={`attendance-session-${index}`}>
                                     <td>{session.date}</td>
                                     <td>{session.time}</td>
                                     <td>{session.location}</td>
@@ -923,7 +803,7 @@ function DoctorDashboard() {
                                     <td>{session.absentCount}</td>
                                     <td>
                                       <span
-                                        className={`status-badge ${attendanceData.getAttendanceStatusClass(session.attendancePercentage)}`}
+                                        className={`status-badge ${session.attendancePercentage >= 75 ? "success" : "error"}`}
                                       >
                                         {session.attendancePercentage}%
                                       </span>
@@ -967,13 +847,13 @@ function DoctorDashboard() {
                         >
                           All Days
                         </button>
-                        {scheduleData.getDaysOfWeek().map((day) => (
+                        {[0, 1, 2, 3, 4, 5, 6].map((dayNum) => (
                           <button
-                            key={day}
-                            onClick={() => setSelectedDay(day)}
-                            className={`day-btn ${selectedDay === day ? "active" : ""}`}
+                            key={dayNum}
+                            onClick={() => setSelectedDay(dayNum)}
+                            className={`day-btn ${selectedDay === dayNum ? "active" : ""}`}
                           >
-                            {day}
+                            {getDayName(dayNum)}
                           </button>
                         ))}
                       </div>
@@ -983,38 +863,37 @@ function DoctorDashboard() {
                           <div className="no-classes">
                             <div className="no-classes-icon">📅</div>
                             <h3>No Classes Scheduled</h3>
-                            <p>You have no classes scheduled for {selectedDay === "All" ? "any day" : selectedDay}.</p>
+                            <p>
+                              You have no classes scheduled for{" "}
+                              {selectedDay === "All" ? "any day" : getDayName(selectedDay)}.
+                            </p>
                           </div>
                         ) : (
                           <div className="timeline">
-                            {filteredSchedule.map((session, index) => {
-                              const timelineData = scheduleData.getTimelineItemData(session)
-                              return (
-                                <div key={index} className="timeline-item">
-                                  <div className="timeline-day">{timelineData.day}</div>
-                                  <div className="timeline-time">
-                                    <span>{timelineData.startTime}</span>
-                                    <span className="timeline-duration">{timelineData.duration}</span>
-                                  </div>
-                                  <div className="timeline-content">
-                                    <div className="timeline-card">
-                                      <h3>{timelineData.courseName}</h3>
-                                      <div className="timeline-details">
-                                        <span>
-                                          <strong>Code:</strong> {timelineData.courseCode}
-                                        </span>
-                                        <span>
-                                          <strong>Location:</strong> {timelineData.location}
-                                        </span>
-                                        <span>
-                                          <strong>Students:</strong> {timelineData.studentsCount}
-                                        </span>
-                                      </div>
+                            {filteredSchedule.map((session, index) => (
+                              <div key={`schedule-${session.lectureName}-${index}`} className="timeline-item">
+                                <div className="timeline-day">{getDayName(session.day)}</div>
+                                <div className="timeline-time">
+                                  <span>{formatTime(session.fromTime)}</span>
+                                  <span className="timeline-duration">
+                                    {formatTime(session.fromTime)} - {formatTime(session.toTime)}
+                                  </span>
+                                </div>
+                                <div className="timeline-content">
+                                  <div className="timeline-card">
+                                    <h3>{session.subjectName}</h3>
+                                    <div className="timeline-details">
+                                      <span>
+                                        <strong>Code:</strong> {session.lectureName}
+                                      </span>
+                                      <span>
+                                        <strong>Faculty:</strong> {session.faculty}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
-                              )
-                            })}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -1032,94 +911,114 @@ function DoctorDashboard() {
                     <div className="settings-container">
                       <div className="settings-section">
                         <h3>Account Settings</h3>
+
                         <div className="settings-group">
-                          {settingsData.getAccountSettings().map((setting, index) => (
-                            <div key={index} className="settings-item">
-                              <div className="settings-item-info">
-                                <h4>{setting.title}</h4>
-                                <p>{setting.description}</p>
-                              </div>
-                              {setting.type === "toggle" ? (
-                                <div className="toggle-switch">
-                                  <input type="checkbox" id={setting.id} />
-                                  <label htmlFor={setting.id}></label>
-                                </div>
-                              ) : (
-                                <button className="settings-btn">{setting.action}</button>
-                              )}
+                          <div className="settings-item">
+                            <div className="settings-item-info">
+                              <h4>Profile Information</h4>
+                              <p>Update your personal information</p>
                             </div>
-                          ))}
+                            <button className="settings-btn">Edit</button>
+                          </div>
+
+                          <div className="settings-item">
+                            <div className="settings-item-info">
+                              <h4>Change Password</h4>
+                              <p>Update your password regularly for security</p>
+                            </div>
+                            <button className="settings-btn">Change</button>
+                          </div>
+
+                          <div className="settings-item">
+                            <div className="settings-item-info">
+                              <h4>Two-Factor Authentication</h4>
+                              <p>Add an extra layer of security to your account</p>
+                            </div>
+                            <div className="toggle-switch">
+                              <input type="checkbox" id="twoFactor" />
+                              <label htmlFor="twoFactor"></label>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
                       <div className="settings-section">
                         <h3>Appearance</h3>
+
                         <div className="settings-group">
-                          {settingsData.getAppearanceSettings().map((setting, index) => (
-                            <div key={index} className="settings-item">
-                              <div className="settings-item-info">
-                                <h4>{setting.title}</h4>
-                                <p>{setting.description}</p>
-                              </div>
-                              {setting.type === "toggle" ? (
-                                <div className="toggle-switch">
-                                  <input
-                                    type="checkbox"
-                                    id={setting.id}
-                                    checked={setting.id === "darkMode" ? darkMode : false}
-                                    onChange={setting.id === "darkMode" ? toggleDarkMode : undefined}
-                                  />
-                                  <label htmlFor={setting.id}></label>
-                                </div>
-                              ) : setting.type === "select" ? (
-                                <select className="settings-select" value={language} onChange={toggleLanguage}>
-                                  {setting.options.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : null}
+                          <div className="settings-item">
+                            <div className="settings-item-info">
+                              <h4>Dark Mode</h4>
+                              <p>Switch between light and dark themes</p>
                             </div>
-                          ))}
+                            <div className="toggle-switch">
+                              <input type="checkbox" id="darkMode" checked={darkMode} onChange={toggleDarkMode} />
+                              <label htmlFor="darkMode"></label>
+                            </div>
+                          </div>
+
+                          <div className="settings-item">
+                            <div className="settings-item-info">
+                              <h4>Language</h4>
+                              <p>Choose your preferred language</p>
+                            </div>
+                            <select className="settings-select" value={language} onChange={toggleLanguage}>
+                              <option value="english">English</option>
+                              <option value="arabic">العربية</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
 
                       <div className="settings-section">
                         <h3>Notifications</h3>
+
                         <div className="settings-group">
-                          {settingsData.getNotificationSettings().map((setting, index) => (
-                            <div key={index} className="settings-item">
-                              <div className="settings-item-info">
-                                <h4>{setting.title}</h4>
-                                <p>{setting.description}</p>
-                              </div>
-                              <div className="toggle-switch">
-                                <input type="checkbox" id={setting.id} defaultChecked={setting.defaultChecked} />
-                                <label htmlFor={setting.id}></label>
-                              </div>
+                          <div className="settings-item">
+                            <div className="settings-item-info">
+                              <h4>Email Notifications</h4>
+                              <p>Receive updates via email</p>
                             </div>
-                          ))}
+                            <div className="toggle-switch">
+                              <input type="checkbox" id="emailNotif" defaultChecked />
+                              <label htmlFor="emailNotif"></label>
+                            </div>
+                          </div>
+
+                          <div className="settings-item">
+                            <div className="settings-item-info">
+                              <h4>SMS Notifications</h4>
+                              <p>Receive updates via SMS</p>
+                            </div>
+                            <div className="toggle-switch">
+                              <input type="checkbox" id="smsNotif" />
+                              <label htmlFor="smsNotif"></label>
+                            </div>
+                          </div>
+
+                          <div className="settings-item">
+                            <div className="settings-item-info">
+                              <h4>Browser Notifications</h4>
+                              <p>Receive updates via browser</p>
+                            </div>
+                            <div className="toggle-switch">
+                              <input type="checkbox" id="browserNotif" defaultChecked />
+                              <label htmlFor="browserNotif"></label>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
                       <div className="settings-section">
-                        <h3>API Settings</h3>
+                        <h3>Data Management</h3>
                         <div className="settings-group">
                           <div className="settings-item">
                             <div className="settings-item-info">
-                              <h4>API URL</h4>
-                              <p>Enter the backend API URL</p>
+                              <h4>Refresh Data</h4>
+                              <p>Reload all data from the server</p>
                             </div>
-                            <input
-                              type="text"
-                              className="settings-input"
-                              value={apiUrl}
-                              onChange={(e) => setApiUrl(e.target.value)}
-                              placeholder="e.g., http://localhost:3000/api"
-                            />
                             <button className="settings-btn" onClick={loadData}>
-                              Update API
+                              Refresh
                             </button>
                           </div>
                         </div>

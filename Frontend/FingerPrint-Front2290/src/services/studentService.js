@@ -5,8 +5,15 @@ const API_BASE_URL = config.BASE_URL
 console.log("\uD83D\uDD27 API_BASE_URL is set to:", API_BASE_URL)
 
 // Get Student Data 
+// Check if logged-in user is student
+const isStudent = () => localStorage.getItem("userType") === "Student";
+
+// ----------------------------- Fetch Student Profile -----------------------------
 export const fetchStudentProfile = async (email) => {
-  if (!email || email === 'undefined' || email.trim() === '') {
+  if (!isStudent()) {
+    console.warn("⛔ fetchStudentProfile called by non-student user");
+    return null;
+  }  if (!email || email === 'undefined' || email.trim() === '') {
     console.log("\u26A0\uFE0F No valid email provided to fetchStudentProfile")
     return null
   }

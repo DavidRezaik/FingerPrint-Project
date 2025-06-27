@@ -30,7 +30,7 @@ function LoginForm() {
     error: "#e74c3c",
   };
 
-  const [signIn, setSignIn] = useState(true);
+  const [signIn, setSignIn] = useState(true); // true = student, false = doctor
   const navigate = useNavigate();
   const { t, toggleLanguage, language } = useLanguage();
   const [email, setEmail] = useState("");
@@ -43,20 +43,24 @@ function LoginForm() {
     setError("");
     setLoading(true);
 
-    // ✅ Static Admin Login
-    if (email === "admin@example.com" && password === "admin123") {
-      const staticAdmin = {
-        userType: "Admin",
-        email,
-        name: "Admin User"
-      };
-      localStorage.setItem("user", JSON.stringify(staticAdmin));
-      navigate("/admin-dashboard");
-      setLoading(false);
-      return;
-    }
-
     try {
+      // ✅ Static Admin Login
+      if (email === "admin@example.com" && password === "admin123") {
+        const staticAdmin = {
+          userType: "Admin",
+          displayName: "Admin User",
+          email,
+          token: "admin-static-token",
+        };
+        localStorage.setItem("userType", "Admin");
+        localStorage.setItem("user", JSON.stringify(staticAdmin));
+        localStorage.setItem("email", email);
+        navigate("/admin-dashboard");
+        setLoading(false);
+        return;
+      }
+
+      // ✅ API Login
       const res = await fetch(`${config.BASE_URL}/api/account/login`, {
         method: "POST",
         headers: {
@@ -73,6 +77,7 @@ function LoginForm() {
         return;
       }
 
+      // ✅ Role Check
       if (signIn && data.userType !== "Student") {
         setError(t("❌ This account is not a student."));
         return;
@@ -82,16 +87,18 @@ function LoginForm() {
         return;
       }
 
-      // ✅ Store user email for student
-      if (data.userType === "Student") {
-        localStorage.setItem("email", JSON.stringify(email));  // ⬅️ إصلاح التخزين
-        navigate("/dashboard");
-      } else if (data.userType === "Doctor") {
-        localStorage.setItem("doctorEmail", email);
-        navigate("/doctor-dashboard");
-      } else {
-        navigate("/");
-      }
+      // ✅ Save user data
+      localStorage.setItem("userType", data.userType);
+      localStorage.setItem("user", JSON.stringify(data));
+      localStorage.setItem("email", data.email);
+
+      console.log("✅ Logged in:", data.userType, data.email);
+
+      // ✅ Navigate by role
+      if (data.userType === "Student") navigate("/dashboard");
+      else if (data.userType === "Doctor") navigate("/doctor-dashboard");
+      else navigate("/");
+
     } catch (err) {
       console.error("Login error:", err);
       setError("❌ Server error. Try again.");
@@ -116,6 +123,7 @@ function LoginForm() {
         </div>
 
         <Components.Container>
+          {/* Doctor Login Form */}
           <Components.SignUpContainer signinIn={!signIn}>
             <Components.Form onSubmit={handleSubmit}>
               <Components.Title>{t("Doctor Login")}</Components.Title>
@@ -123,9 +131,7 @@ function LoginForm() {
                 <FaChalkboardTeacher size={40} color="#1b2a49" />
               </div>
               <Components.InputGroup>
-                <Components.InputIcon>
-                  <FaChalkboardTeacher />
-                </Components.InputIcon>
+                <Components.InputIcon><FaChalkboardTeacher /></Components.InputIcon>
                 <Components.Input
                   type="email"
                   placeholder={t("Email")}
@@ -135,9 +141,7 @@ function LoginForm() {
                 />
               </Components.InputGroup>
               <Components.InputGroup>
-                <Components.InputIcon>
-                  <FaLock />
-                </Components.InputIcon>
+                <Components.InputIcon><FaLock /></Components.InputIcon>
                 <Components.Input
                   type="password"
                   placeholder={t("Password")}
@@ -154,6 +158,7 @@ function LoginForm() {
             </Components.Form>
           </Components.SignUpContainer>
 
+          {/* Student Login Form */}
           <Components.SignInContainer signinIn={signIn}>
             <Components.Form onSubmit={handleSubmit}>
               <Components.Title>{t("Login Form")}</Components.Title>
@@ -161,9 +166,7 @@ function LoginForm() {
                 <FaUserGraduate size={40} color="#1b2a49" />
               </div>
               <Components.InputGroup>
-                <Components.InputIcon>
-                  <FaUserGraduate />
-                </Components.InputIcon>
+                <Components.InputIcon><FaUserGraduate /></Components.InputIcon>
                 <Components.Input
                   type="email"
                   placeholder={t("Email")}
@@ -173,9 +176,7 @@ function LoginForm() {
                 />
               </Components.InputGroup>
               <Components.InputGroup>
-                <Components.InputIcon>
-                  <FaLock />
-                </Components.InputIcon>
+                <Components.InputIcon><FaLock /></Components.InputIcon>
                 <Components.Input
                   type="password"
                   placeholder={t("Password")}
@@ -192,6 +193,7 @@ function LoginForm() {
             </Components.Form>
           </Components.SignInContainer>
 
+          {/* Overlay between Doctor <-> Student */}
           <Components.OverlayContainer signinIn={signIn}>
             <Components.Overlay signinIn={signIn}>
               <Components.LeftOverlayPanel signinIn={signIn}>
@@ -201,7 +203,6 @@ function LoginForm() {
                   {t("Student Login")}
                 </Components.GhostButton>
               </Components.LeftOverlayPanel>
-
               <Components.RightOverlayPanel signinIn={signIn}>
                 <Components.Title inOverlay>{t("Welcome Students!")}</Components.Title>
                 <Components.Paragraph>{t("For Instructors, Sign In below")}</Components.Paragraph>
