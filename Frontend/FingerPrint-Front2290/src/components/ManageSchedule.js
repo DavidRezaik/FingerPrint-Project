@@ -14,7 +14,7 @@ function ManageSchedule() {
   const [faculties, setFaculties] = useState([]);
   const [facultyYears, setFacultyYears] = useState([]);
   const [courses, setCourses] = useState([]);
-  const [schedule, setSchedule] = useState([]);
+ const [schedule, setSchedule] = useState([]);
   const [form, setForm] = useState({
     day: "Saturday",
     course: "",
@@ -30,12 +30,17 @@ function ManageSchedule() {
     fetch(`${BASE_URL}/api/Subjects/GetAllSubjects`).then(res => res.json()).then(setCourses);
     loadSchedule();
   }, []);
-
-  const loadSchedule = async () => {
+const loadSchedule = async () => {
+  try {
     const res = await fetch(`${BASE_URL}/api/Lecture/GetAllLecture`);
     const data = await res.json();
-    setSchedule(data);
-  };
+      console.log("Schedule API response:", data);
+    setSchedule(Array.isArray(data) ? data : []);
+  } catch (err) {
+    setSchedule([]); // أي خطأ: setSchedule إلى Array فاضية
+  }
+};
+
 
   const resetFilters = () => {
     setSelectedFaculty("");

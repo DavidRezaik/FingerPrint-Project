@@ -2,9 +2,8 @@ import axios from 'axios'
 import config from "../config"
 
 const API_BASE_URL = config.BASE_URL
-console.log("\uD83D\uDD27 API_BASE_URL is set to:", API_BASE_URL)
+console.log("🔧 API_BASE_URL is set to:", API_BASE_URL)
 
-// Get Student Data 
 // Check if logged-in user is student
 const isStudent = () => localStorage.getItem("userType") === "Student";
 
@@ -13,30 +12,31 @@ export const fetchStudentProfile = async (email) => {
   if (!isStudent()) {
     console.warn("⛔ fetchStudentProfile called by non-student user");
     return null;
-  }  if (!email || email === 'undefined' || email.trim() === '') {
-    console.log("\u26A0\uFE0F No valid email provided to fetchStudentProfile")
+  }
+  if (!email || email === 'undefined' || email.trim() === '') {
+    console.log("⚠️ No valid email provided to fetchStudentProfile")
     return null
   }
 
   try {
     const fullUrl = `${API_BASE_URL}/api/Studets/GetStudetByEmail?Email=${encodeURIComponent(email)}`
-    console.log("\uD83D\uDD0D Full URL being called:", fullUrl)
+    console.log("🔍 Full URL being called:", fullUrl)
 
     const response = await fetch(fullUrl, {
       method: 'GET',
       headers: { "accept": "text/plain" }
     })
 
-    console.log("\ud83d\udcf1 Response status:", response.status)
+    console.log("📡 Response status:", response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.log("\u274C Error response body:", errorText)
+      console.log("❌ Error response body:", errorText)
       throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
     }
 
     const data = await response.text()
-    console.log("\u2705 Raw response:", data)
+    console.log("✅ Raw response:", data)
 
     try {
       return JSON.parse(data)
@@ -44,7 +44,7 @@ export const fetchStudentProfile = async (email) => {
       return data
     }
   } catch (error) {
-    console.error("\u274C Error fetching student profile:", error)
+    console.error("❌ Error fetching student profile:", error)
     throw error
   }
 }
@@ -54,7 +54,7 @@ export const fetchAllSemesters = async () => {
     const response = await axios.get(`${API_BASE_URL}/api/FacultyYearSemister/GetAllSemisters`)
     return response.data
   } catch (error) {
-    console.error("\u274C Failed to fetch semesters:", error)
+    console.error("❌ Failed to fetch semesters:", error)
     return []
   }
 }
@@ -64,7 +64,7 @@ export const fetchAllFacultyYears = async () => {
     const response = await axios.get(`${API_BASE_URL}/api/FacultyYear/GetAllFacultyYear`)
     return response.data
   } catch (error) {
-    console.error("\u274C Failed to fetch faculty years:", error)
+    console.error("❌ Failed to fetch faculty years:", error)
     return []
   }
 }
@@ -74,7 +74,7 @@ export const fetchAllFaculties = async () => {
     const response = await axios.get(`${API_BASE_URL}/api/Faculty/GetAllFaculty`)
     return response.data
   } catch (error) {
-    console.error("\u274C Failed to fetch faculties:", error)
+    console.error("❌ Failed to fetch faculties:", error)
     return []
   }
 }
@@ -134,7 +134,6 @@ export const fetchTimeTable = async (email) => {
     // 7. إعداد جدول الطالب مع عرض اسم الغرفة
     const mapped = myLectures.map((lec) => {
       const subject = subjectMap[lec.sub_ID] || {};
-      // حاول تجيب room_ID من المحاضرة أولاً، ثم من المادة
       let roomName = "Main Campus";
       if (lec.room_ID && roomMap[lec.room_ID]) {
         roomName = roomMap[lec.room_ID];
@@ -158,7 +157,6 @@ export const fetchTimeTable = async (email) => {
     return [];
   }
 };
-
 
 export const fetchCourseAttendance = async (id) => {
   try {
@@ -194,34 +192,31 @@ export const fetchAttendanceSummary = async () => {
   }
 }
 
-export const fetchFingerprintLogs = async () => {
+// ------------------- حضور الطالب من Attendance API ----------------------
+export const fetchStudentAttendanceLogs = async (studentId = null) => {
   try {
-    const logsResponse = await axios.get(`${API_BASE_URL}/api/FingerprintLogs/GetAllFingerprintLogs`, {
+    // ممكن ترسل studentId هنا لو عايز فلترة من الباك اند في المستقبل
+    const response = await axios.get(`${API_BASE_URL}/api/Attendance/GetAllSubjects`, {
       headers: { "Content-Type": "application/json" }
     })
 
-    if (!logsResponse.data) throw new Error("Failed to fetch fingerprint logs")
-
-    const courseResponse = await axios.get(`${API_BASE_URL}/api/Attendance/GetAllSubjects`, {
-      headers: { "Content-Type": "application/json" }
-    })
-
-    if (!courseResponse.data) throw new Error("Failed to fetch course details")
-
-    const logsData = logsResponse.data
-    const courseData = courseResponse.data
-
-    return logsData.map((log, index) => ({
-      date: log.date || "2025-05-05",
-      time: log.time || "09:00 AM",
-      location: log.location || "Main Gate",
-      result: log.result || "Success",
-      courseCode: courseData[index]?.subCode || "CS201"
-    }))
+    if (!response.data || !Array.isArray(response.data)) {
+      throw new Error("Failed to fetch attendance logs or invalid data")
+    }
+    // لو هتفلتر من الواجهة (لو الـ API مش بيرجع إلا سجلات الطالب الحالي فقط)
+    if (studentId) {
+      return response.data.filter(item => item.st_ID === studentId)
+    }
+    return response.data
   } catch (error) {
-    console.error("Error fetching fingerprint logs:", error)
+    console.error("Error fetching student attendance logs:", error)
     return []
   }
+}
+
+// دعم الاسم القديم بدون كسر أي كود
+export const fetchFingerprintLogs = async (...args) => {
+  return fetchStudentAttendanceLogs(...args)
 }
 
 export const matchFingerprint = async () => {
@@ -248,7 +243,7 @@ export const fetchStudentNotifications = async (facYearSem_ID) => {
       isRead: readIds.includes(n.id)
     }))
   } catch (error) {
-    console.error("\u274C Failed to fetch student notifications:", error)
+    console.error("❌ Failed to fetch student notifications:", error)
     return []
   }
 }

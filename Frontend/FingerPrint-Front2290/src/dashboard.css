@@ -1076,6 +1076,97 @@ html[dir="rtl"] .language-toggle-container {
 }
 
 .data-table-container {
+  width: 100%;
+  background: #f6f9fc;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px #0001;
+  padding: 0;
+  margin-top: 20px;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse !important;
+  background: #fff;
+  margin: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  min-width: 800px;
+  table-layout: fixed; /* Important for alignment */
+}
+
+.data-table th, .data-table td {
+  padding: 14px 10px !important;
+  border: none;
+  border-bottom: 1.5px solid #f1f3f7;
+  font-size: 15px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  text-align: left;
+  background: #fff !important;
+}
+
+.data-table th {
+  background: #f3f6fa !important;
+  font-weight: 600;
+  color: #246bce;
+  border-bottom: 2.5px solid #e4e8f1;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+
+.data-table td {
+  color: #232a33;
+}
+
+.data-table tr:last-child td {
+  border-bottom: none !important;
+}
+
+.data-table td button {
+  margin: 0 3px !important;
+  padding: 6px 9px !important;
+  font-size: 15px !important;
+  border-radius: 6px !important;
+  border: none !important;
+  cursor: pointer;
+  background: #f4f8fb !important;
+  transition: background 0.2s;
+}
+
+.data-table td button.edit-button {
+  color: #127f30 !important;
+  background: #e6fbe9 !important;
+}
+
+.data-table td button.delete-button {
+  color: #c92020 !important;
+  background: #fff0f0 !important;
+}
+
+.data-table td button:hover {
+  background: #e4edfa !important;
+}
+
+.data-table tbody tr:hover td {
+  background: #f2f6fd !important;
+  transition: background 0.13s;
+}
+
+@media (max-width: 1024px) {
+  .data-table {
+    min-width: 600px !important;
+    font-size: 14px !important;
+  }
+  .data-table th, .data-table td {
+    padding: 9px 6px !important;
+    font-size: 13px !important;
+  }
+}
+
+.data-table-container {
   background-color: var(--card-bg);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);

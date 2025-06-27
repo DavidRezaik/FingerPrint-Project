@@ -18,8 +18,9 @@ function CourseAttendanceTab({ searchQuery }) {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const email = JSON.parse(localStorage.getItem("email"))
-        if (!email) throw new Error("Student email not found")
+  const email = localStorage.getItem("email");
+if (!email) throw new Error("Student email not found");
+
 
         const profile = await fetchStudentProfile(email)
         if (!profile || !profile.facYearSem_ID) throw new Error("Student semester not found")

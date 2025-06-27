@@ -2,48 +2,51 @@
 
 import { useState, useEffect } from "react"
 import { FaFingerprint } from "react-icons/fa"
-import { fetchFingerprintLogs, fetchTimeTable, matchFingerprint } from "../services/studentService"
+import { fetchStudentProfile, fetchStudentAttendanceLogs, fetchTimeTable, matchFingerprint } from "../services/studentService"
 import { useLanguage } from "../contexts/LanguageContext"
 
 function FingerprintLogTab({ searchQuery }) {
   const { t } = useLanguage()
-
-  const [fingerprintLogs, setFingerprintLogs] = useState([])
+  const [attendanceRecords, setAttendanceRecords] = useState([])
   const [TimeTable, setTimeTable] = useState([])
   const [fingerprintTodayScanned, setFingerprintTodayScanned] = useState(false)
   const [isFingerprintScanning, setIsFingerprintScanning] = useState(false)
-  const [logResultFilter, setLogResultFilter] = useState("all")
-  const [logLocationFilter, setLogLocationFilter] = useState("all")
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const userString = localStorage.getItem("email")
-        if (!userString) return
+        const email = localStorage.getItem("email")
+        if (!email) return
 
-        let email = null
-        try {
-          const parsed = JSON.parse(userString)
-          email = typeof parsed === "object" && parsed.email ? parsed.email : parsed
-        } catch {
-          email = userString
-        }
+        // جلب بيانات الطالب لمعرفة الاسم الإنجليزي
+        const profile = await fetchStudentProfile(email)
+        if (!profile || !profile.st_NameEn) return
 
-        if (!email || email.trim() === "") return
+        const studentName = profile.st_NameEn
 
-        const [logs, table] = await Promise.all([fetchFingerprintLogs(), fetchTimeTable(email)])
+        // جلب جميع سجلات الحضور
+        const allAttendance = await fetchStudentAttendanceLogs()
 
-        setFingerprintLogs(logs)
+        // فلترة الحضور بناء على الاسم الإنجليزي
+        const studentAttendance = allAttendance.filter(
+          record => record.st_NameEn && record.st_NameEn.trim().toLowerCase() === studentName.trim().toLowerCase()
+        )
+        setAttendanceRecords(studentAttendance)
+
+        // جلب جدول المحاضرات (اختياري)
+        const table = await fetchTimeTable(email)
         setTimeTable(table)
 
-        const today = new Date().toISOString().slice(0, 10)
-        const scannedToday = logs.some((log) => log.date === today && log.result === "Success")
+        // تحقق إذا كان الطالب حضر اليوم (لو يوجد حقل fingerTime يمثل اليوم)
+        const today = new Date().toLocaleDateString("en-US", { weekday: "long" }) // مثل: "Sunday"
+        const scannedToday = studentAttendance.some(
+          record => record.fingerTime === today && record.atten
+        )
         setFingerprintTodayScanned(scannedToday)
       } catch (error) {
-        console.error("❌ Error loading fingerprint log data:", error)
+        console.error("❌ Error loading attendance data:", error)
       }
     }
-
     loadData()
   }, [])
 
@@ -61,100 +64,61 @@ function FingerprintLogTab({ searchQuery }) {
     }
   }
 
-  const filteredLogs = fingerprintLogs.filter((log) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      log.date.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.courseCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.result.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesResult = logResultFilter === "all" || log.result.toLowerCase() === logResultFilter.toLowerCase()
-
-    const matchesLocation =
-      logLocationFilter === "all" || log.location.toLowerCase().includes(logLocationFilter.toLowerCase())
-
-    return matchesSearch && matchesResult && matchesLocation
+  // فلترة حسب البحث
+  const filteredRecords = attendanceRecords.filter(record => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return (
+      record.sub_Name?.toLowerCase().includes(q) ||
+      record.room_Num?.toLowerCase().includes(q) ||
+      record.dr_NameEn?.toLowerCase().includes(q) ||
+      (record.fingerTime || "").toLowerCase().includes(q)
+    )
   })
 
   return (
     <div className="section-layout">
       <div className="section-header">
-        <h1>{t("Fingerprint Log")}</h1>
-        <p className="subtitle">{t("Track your attendance records")}</p>
+        <h1>{t("Attendance Records")}</h1>
+        <p className="subtitle">{t("Track your attendance through fingerprint scans")}</p>
       </div>
 
-      <div className="data-filters">
-        <div className="filter-group">
-          <select
-            className="filter-select"
-            value={logResultFilter}
-            onChange={(e) => setLogResultFilter(e.target.value)}
-          >
-            <option value="all">{t("All Results")}</option>
-            <option value="success">{t("Success")}</option>
-            <option value="failed">{t("Failed")}</option>
-          </select>
+      {!fingerprintTodayScanned && (
+        <button onClick={handleFingerprintScan} className="action-button" disabled={isFingerprintScanning}>
+          <FaFingerprint /> {isFingerprintScanning ? t("Scanning...") : t("Scan Fingerprint")}
+        </button>
+      )}
 
-          <select
-            className="filter-select"
-            value={logLocationFilter}
-            onChange={(e) => setLogLocationFilter(e.target.value)}
-          >
-            <option value="all">{t("All Locations")}</option>
-            <option value="main">{t("Main Campus")}</option>
-            <option value="lab">{t("Lab Building")}</option>
-            <option value="library">{t("Library")}</option>
-          </select>
-        </div>
-
-        {!fingerprintTodayScanned && (
-          <button onClick={handleFingerprintScan} className="action-button" disabled={isFingerprintScanning}>
-            <FaFingerprint /> {isFingerprintScanning ? t("Scanning...") : t("Scan Fingerprint")}
-          </button>
-        )}
-      </div>
-
-      <div className="data-table-container">
-        {filteredLogs.length === 0 ? (
+      <div className="data-table-container" style={{ marginTop: 15 }}>
+        {filteredRecords.length === 0 ? (
           <div className="no-data-message">
-            <p>{t("No fingerprint logs found matching your search criteria.")}</p>
+            <p>{t("No attendance records found matching your search criteria.")}</p>
           </div>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
-                <th>{t("Date")}</th>
-                <th>{t("Time")}</th>
-                <th>{t("Location")}</th>
-                <th>{t("Course")}</th>
-                <th>{t("Code")}</th>
-                <th>{t("Result")}</th>
+                <th>{t("Subject")}</th>
+                <th>{t("Doctor")}</th>
+                <th>{t("Room")}</th>
+                <th>{t("Day")}</th>
+                <th>{t("Attendance")}</th>
               </tr>
             </thead>
             <tbody>
-              {filteredLogs.map((log, index) => {
-                const matchedCourse =
-                  TimeTable.find(
-                    (t) =>
-                      t.courseCode === log.courseCode &&
-                      t.day === new Date(log.date).toLocaleDateString("en-US", { weekday: "long" }),
-                  ) || {}
-                return (
-                  <tr key={index}>
-                    <td>{log.date}</td>
-                    <td>{log.time}</td>
-                    <td>{log.location}</td>
-                    <td>{matchedCourse.course || "N/A"}</td>
-                    <td>{log.courseCode || "N/A"}</td>
-                    <td>
-                      <span className={`status-badge ${log.result === "Success" ? "success" : "error"}`}>
-                        {log.result}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
+              {filteredRecords.map((record, index) => (
+                <tr key={index}>
+                  <td>{record.sub_Name}</td>
+                  <td>{record.dr_NameEn}</td>
+                  <td>{record.room_Num}</td>
+                  <td>{record.fingerTime}</td>
+                  <td>
+                    <span className={`status-badge ${record.atten ? "success" : "error"}`}>
+                      {record.atten ? t("Present") : t("Absent")}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}
